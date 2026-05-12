@@ -1337,9 +1337,10 @@ Anthropic API (for pages that call Claude directly):
                         }, 380);
                       });
                     }, { once: true });
-                    newFrame.srcdoc = liveHtml;
+                    // Inject bridge early so ChatBridge works during streaming
+                    newFrame.srcdoc = injectChatBridge(liveHtml);
                   } else if (htmlRevealed) {
-                    throttledRender(liveHtml);
+                    throttledRender(injectChatBridge(liveHtml));
                   }
                 }
               }
@@ -1380,9 +1381,9 @@ Anthropic API (for pages that call Claude directly):
                       }, 380);
                     });
                   }, { once: true });
-                  newFrame.srcdoc = liveHtml;
+                  newFrame.srcdoc = injectChatBridge(liveHtml);
                 } else if (htmlRevealed) {
-                  throttledRender(liveHtml);
+                  throttledRender(injectChatBridge(liveHtml));
                 }
               }
             }
