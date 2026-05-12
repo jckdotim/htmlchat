@@ -441,6 +441,19 @@
       text-align: center; font-family: var(--font-mono);
     }
 
+    #modal-tabs {
+      display: flex; gap: 4px; margin-bottom: 16px;
+    }
+    .modal-tab {
+      flex: 1; padding: 7px 0;
+      border-radius: 7px; border: 1px solid var(--border);
+      background: #0f0f0f; color: var(--text-muted);
+      font-family: var(--font-mono); font-size: 11px;
+      cursor: pointer; transition: background 120ms, color 120ms, border-color 120ms;
+    }
+    .modal-tab:hover { background: #1a1a1a; color: var(--text-dim); }
+    .modal-tab.active { background: var(--accent-glow); border-color: rgba(37,99,235,0.5); color: #93c5fd; }
+
     /* ── TOAST ── */
     #toast {
       position: fixed; bottom: 24px; left: 50%;
@@ -526,7 +539,7 @@
         <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       </div>
       <h2>Start a conversation</h2>
-      <p>Claude responds with rich, interactive HTML rendered right in the chat.</p>
+      <p>AI responds with rich, interactive HTML rendered right in the chat.</p>
       <span class="empty-hint">Try: "Build a pomodoro timer" or "Visualize sorting algorithms"</span>
     </div>
   </div>
@@ -534,7 +547,7 @@
   <!-- INPUT -->
   <div id="input-area">
     <div id="input-wrapper">
-      <textarea id="chat-input" placeholder="Ask Claude to build something..." rows="1" autocomplete="off" spellcheck="true"></textarea>
+      <textarea id="chat-input" placeholder="Ask AI to build something..." rows="1" autocomplete="off" spellcheck="true"></textarea>
       <button id="send-btn" title="Send (Enter)">
         <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
       </button>
@@ -568,17 +581,21 @@
     <div id="modal-logo">
       <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     </div>
-    <h2>Enter your API key</h2>
-    <p>
-      Your <span id="modal-provider-name">Anthropic</span> API key is stored only in
-      <code style="font-family:var(--font-mono);font-size:11px;color:#93c5fd;">localStorage</code>
-      and sent only to the provider's servers.
-    </p>
-    <label class="modal-label" for="api-key-input">Anthropic API Key</label>
+    <h2>API Keys</h2>
+    <p style="margin-bottom:16px;">Keys are stored only in <code style="font-family:var(--font-mono);font-size:11px;color:#93c5fd;">localStorage</code> and sent only to each provider.</p>
+
+    <!-- Provider tabs -->
+    <div id="modal-tabs">
+      <button class="modal-tab active" data-provider="anthropic">Anthropic</button>
+      <button class="modal-tab" data-provider="deepseek">DeepSeek</button>
+      <button class="modal-tab" data-provider="openrouter">OpenRouter</button>
+    </div>
+
+    <label class="modal-label" for="api-key-input" id="modal-key-label">Anthropic API Key</label>
     <input id="api-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false" />
     <div id="modal-error"></div>
-    <button id="modal-submit">Start chatting</button>
-    <p class="modal-footnote">Key saved locally · Never shared · Change anytime via ⚙</p>
+    <button id="modal-submit">Save key</button>
+    <p class="modal-footnote">Key saved locally · Never shared</p>
   </div>
 </div>
 
@@ -876,11 +893,26 @@ about at least 3 more things, and clicking any of them should feel instant and m
     });
   }
 
-  function updateModalForProvider() {
-    const p = PROVIDERS[state.provider];
-    $('modal-provider-name').textContent = p.name;
+  // Track which provider the modal is currently editing (may differ from state.provider)
+  let modalProvider = 'anthropic';
+
+  function updateModalForProvider(provider) {
+    modalProvider = provider || state.provider;
+    const p = PROVIDERS[modalProvider];
+    $('modal-key-label').textContent = p.name + ' API Key';
     apiKeyInput.placeholder = p.placeholder;
     apiKeyInput.value = localStorage.getItem(p.keyStorageKey) || '';
+    modalError.classList.remove('visible');
+    // Update tab active state
+    document.querySelectorAll('.modal-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.provider === modalProvider);
+    });
+  }
+
+  function setupModalTabs() {
+    document.querySelectorAll('.modal-tab').forEach(tab => {
+      tab.addEventListener('click', () => updateModalForProvider(tab.dataset.provider));
+    });
   }
 
   // ── INIT ──────────────────────────────────────────────────────
@@ -895,6 +927,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
     }
     setupInput();
     setupModal();
+    setupModalTabs();
     setupMaximize();
     setupNewChat();
     setupModelPicker();
@@ -937,10 +970,24 @@ about at least 3 more things, and clicking any of them should feel instant and m
     const key = apiKeyInput.value.trim();
     if (!key) { showError('Please enter your API key.'); return; }
     if (!key.startsWith('sk-')) { showError('API key should start with "sk-".'); return; }
-    state.apiKey = key;
-    localStorage.setItem(PROVIDERS[state.provider].keyStorageKey, key);
+    localStorage.setItem(PROVIDERS[modalProvider].keyStorageKey, key);
+    // If saving for the currently active provider, update state too
+    if (modalProvider === state.provider) state.apiKey = key;
     modalError.classList.remove('visible');
-    hideModal();
+    showToast(PROVIDERS[modalProvider].name + ' key saved');
+    // Move to next tab without a key, or close if all done
+    const providers = Object.keys(PROVIDERS);
+    const next = providers.find(p => p !== modalProvider && !localStorage.getItem(PROVIDERS[p].keyStorageKey));
+    if (next && !state.apiKey) {
+      updateModalForProvider(next);
+    } else {
+      if (!state.apiKey) {
+        // Set apiKey to the first available key
+        const first = providers.find(p => localStorage.getItem(PROVIDERS[p].keyStorageKey));
+        if (first) { state.provider = first; state.model = first === 'anthropic' ? 'claude-opus-4-7' : first === 'deepseek' ? 'deepseek-chat' : 'google/gemini-2.5-pro'; state.apiKey = localStorage.getItem(PROVIDERS[first].keyStorageKey); }
+      }
+      hideModal();
+    }
   }
 
   function showError(msg) {
