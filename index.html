@@ -1092,6 +1092,13 @@ about at least 3 more things, and clicking any of them should feel instant and m
     if (!state.apiKey) { showModal(); return; }
 
     emptyState.classList.add('hidden');
+
+    // On first message, update URL so it's shareable (reuses existing /Topic routing)
+    if (state.conversation.length === 0) {
+      const slug = text.trim().replace(/\s+/g, '-');
+      history.replaceState(null, '', '/' + encodeURIComponent(slug));
+    }
+
     state.conversation.push({ role: 'user', content: text });
     appendUserBubble(text);
 
