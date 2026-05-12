@@ -969,24 +969,19 @@ about at least 3 more things, and clicking any of them should feel instant and m
     const key = apiKeyInput.value.trim();
     if (!key) { showError('Please enter your API key.'); return; }
     if (!key.startsWith('sk-')) { showError('API key should start with "sk-".'); return; }
+    // Save for whichever tab is active in the modal
     localStorage.setItem(PROVIDERS[modalProvider].keyStorageKey, key);
-    // If saving for the currently active provider, update state too
-    if (modalProvider === state.provider) state.apiKey = key;
-    modalError.classList.remove('visible');
     showToast(PROVIDERS[modalProvider].name + ' key saved');
-    // Move to next tab without a key, or close if all done
-    const providers = Object.keys(PROVIDERS);
-    const next = providers.find(p => p !== modalProvider && !localStorage.getItem(PROVIDERS[p].keyStorageKey));
-    if (next && !state.apiKey) {
-      updateModalForProvider(next);
-    } else {
-      if (!state.apiKey) {
-        // Set apiKey to the first available key
-        const first = providers.find(p => localStorage.getItem(PROVIDERS[p].keyStorageKey));
-        if (first) { state.provider = first; state.model = first === 'anthropic' ? 'claude-opus-4-7' : first === 'deepseek' ? 'deepseek-chat' : 'google/gemini-2.5-pro'; state.apiKey = localStorage.getItem(PROVIDERS[first].keyStorageKey); }
-      }
-      hideModal();
+    // Always sync state if modal provider matches current provider
+    if (modalProvider === state.provider) state.apiKey = key;
+    // If we had no key at all, automatically use this one
+    if (!state.apiKey) {
+      state.provider = modalProvider;
+      state.apiKey = key;
+      modelBadge.textContent = PROVIDERS[modalProvider].name + ' ▾';
     }
+    modalError.classList.remove('visible');
+    hideModal();
   }
 
   function showError(msg) {
