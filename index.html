@@ -812,7 +812,10 @@ NAVIGATION STYLE GUIDE:
 - Clickable concepts: inline, look like wiki links (blue/accent underline, cursor:pointer)
 - Section deep-dives: small "↗" badge on hover near headings
 - Bottom explore panel: card grid with topic name + one-line teaser, clicking sends the query
-- Never use <a href> for internal navigation — always ChatBridge.send()
+- For ALL navigable links, use this pattern:
+    <a href="/Query-text-here" data-cb="Query text here">Query text here</a>
+  The href uses Wikipedia-style slug (spaces→hyphens). The data-cb holds the natural query text.
+  ChatBridge auto-intercepts clicks: plain click sends in current context, Shift/Cmd/middle-click opens a new tab with a fresh context starting from that query.
 - Write queries as natural human curiosity, not explicit context-carrying prompts.
   The conversation history already carries the context — trust it.
 
@@ -1383,6 +1386,15 @@ about at least 3 more things, and clicking any of them should feel instant and m
     const bridge = `<script>
 (function(){
   var _listeners = [];
+  // Intercept [data-cb] anchor clicks: plain click → send in context, modifier → let browser open href
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest('a[data-cb]');
+    if (!a) return;
+    if (e.shiftKey || e.metaKey || e.ctrlKey || e.button === 1) return; // let browser handle
+    e.preventDefault();
+    window.ChatBridge.send(a.getAttribute('data-cb'));
+  });
+
   window.ChatBridge = {
     // Send a message into the chat as if the user typed it
     send: function(text) {
