@@ -1293,7 +1293,7 @@ Linking (use only when navigation feels natural — not required):
             }
             if (ev.type === 'content_block_delta') {
               if (ev.delta?.type === 'thinking_delta') {
-                if (!htmlRevealed) appendThinkingChunk(iframe, ev.delta.thinking);
+                if (!htmlRevealed) appendThinkingChunk(ev.delta.thinking);
               }
               if (ev.delta?.type === 'text_delta') {
                 accumulated += ev.delta.text;
@@ -1332,7 +1332,13 @@ Linking (use only when navigation feels natural — not required):
             }
           } else {
             // OpenAI-compatible SSE (DeepSeek / OpenRouter)
-            const delta = ev.choices?.[0]?.delta?.content;
+            const d = ev.choices?.[0]?.delta;
+            // DeepSeek uses reasoning_content, OpenRouter uses reasoning or reasoning_content
+            const reasoningDelta = d?.reasoning_content || d?.reasoning;
+            if (reasoningDelta && !htmlRevealed) {
+              appendThinkingChunk(reasoningDelta);
+            }
+            const delta = d?.content;
             if (delta) {
               accumulated += delta;
               const liveHtml = extractHtml(accumulated);
