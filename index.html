@@ -881,12 +881,11 @@ about at least 3 more things, and clicking any of them should feel instant and m
         modelDropdown.querySelectorAll('.model-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         modelDropdown.classList.add('hidden');
-        // Check if we have a key for this provider
+        // Load key for this provider (clear if not set)
         const key = localStorage.getItem(PROVIDERS[provider].keyStorageKey);
-        if (key) {
-          state.apiKey = key;
-        } else {
-          updateModalForProvider();
+        state.apiKey = key || '';
+        if (!key) {
+          updateModalForProvider(provider);
           showModal();
         }
       });
