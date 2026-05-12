@@ -1028,7 +1028,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
   function setupInput() {
     sendBtn.addEventListener('click', sendMessage);
     inputEl.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); }
     });
     inputEl.addEventListener('input', () => {
       inputEl.style.height = 'auto';
