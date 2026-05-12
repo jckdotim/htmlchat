@@ -1165,12 +1165,13 @@ Linking (use only when navigation feels natural — not required):
     const appendThinkingChunk = makeThinkingAppender(iframe);
 
     let accumulated = '';
+    let activeIframe = iframe; // updated when thinking iframe is swapped out
 
     // During streaming: document.write for live preview (fast, no full reload).
     // After streaming: srcdoc swap so scripts execute cleanly in a fresh context.
     function liveRenderToIframe(html) {
       try {
-        const doc = iframe.contentDocument;
+        const doc = activeIframe.contentDocument;
         doc.open();
         doc.write(html);
         doc.close();
@@ -1179,7 +1180,7 @@ Linking (use only when navigation feels natural — not required):
 
     function finalRenderToIframe(html) {
       // srcdoc causes a proper reload → scripts fire correctly
-      iframe.srcdoc = html;
+      activeIframe.srcdoc = html;
     }
 
     // Throttle live updates to 400ms to reduce churn while streaming
@@ -1320,6 +1321,7 @@ Linking (use only when navigation feels natural — not required):
                           newFrame.style.position = '';
                           newFrame.style.inset = '';
                           newFrame.style.transition = '';
+                          activeIframe = newFrame; // throttledRender now targets the real frame
                         }, 380);
                       });
                     }, { once: true });
@@ -1362,6 +1364,7 @@ Linking (use only when navigation feels natural — not required):
                         newFrame.style.position = '';
                         newFrame.style.inset = '';
                         newFrame.style.transition = '';
+                        activeIframe = newFrame;
                       }, 380);
                     });
                   }, { once: true });
