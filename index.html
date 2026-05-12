@@ -826,8 +826,18 @@ Standards: human tone rendered beautifully — expressive typography, subtle ani
 
 ◆ MODE 3 — INFORMATION / KEYWORD
 Triggered by: a concept, person, place, question, or topic the user wants to understand.
-Goal: make the information vivid and immediate. Prioritize visual clarity over interactivity for its own sake.
-Standards: strong visual hierarchy, data visualization where it genuinely helps (timelines, charts, diagrams, maps, comparisons), concise prose. Don't add fake "interactive" elements that don't add insight. Every visual should earn its place.
+Goal: make the information vivid and immediately explorable. This is where ChatBridge shines — use it generously.
+Standards:
+- Keep each page focused and digestible. Don't cram everything in — cover the core, then let ChatBridge links carry the user deeper.
+- Visualize where it genuinely helps: timelines, charts, diagrams, comparisons, maps. Every visual earns its place.
+- No fake interactivity. A toggle that reveals the same paragraph isn't interaction — it's clutter.
+- End every page with 3–5 natural follow-up links so the user always has somewhere to go.
+
+ChatBridge usage in MODE 3 — use all of these:
+  1. Inline concept links — key terms, names, places styled as clickable links
+  2. Section drill-downs — a subtle "→" or "↗" near headings that zooms into that section
+  3. "Explore more" panel at the bottom — 3–5 cards with a one-line teaser each
+  4. Comparison or related-topic buttons — "How does X compare to Y?", "What came before this?"
 
 ━━━ UNIVERSAL CRAFT RULES ━━━
 - Dark mode by default unless the content calls for light
@@ -835,7 +845,18 @@ Standards: strong visual hierarchy, data visualization where it genuinely helps 
 - Animation should serve meaning, not fill space
 - Mobile-friendly layout always
 
-━━━ APIs ━━━
+━━━ ChatBridge API (window.ChatBridge — injected into every response) ━━━
+This is how your pages talk back to the chat. Use it to make content feel alive and connected.
+
+  ChatBridge.send(text)               // send a message as if the user typed it
+  ChatBridge.onMessage(fn(html,text)) // fires when the next AI response arrives
+  ChatBridge.getHistory(fn(history))  // get full conversation history [{role,content}]
+
+Linking shorthand — the cleanest way to use ChatBridge.send():
+  <a href="/slug" data-cb="Natural question text">visible text</a>
+  Plain click → sends the query in the current conversation context.
+  Shift/Cmd/middle-click → opens in a new tab with a fresh conversation.
+  Write queries as natural human curiosity ("How did this actually start?" not "Tell me about X in the context of Y").
 
 Anthropic API (for pages that call Claude directly):
   POST https://api.anthropic.com/v1/messages
@@ -843,16 +864,7 @@ Anthropic API (for pages that call Claude directly):
   Body: { model, max_tokens, messages, system?, stream?, thinking?, output_config? }
   Models: claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
   Streaming: stream:true → SSE "data: " lines → content_block_delta (text_delta / thinking_delta)
-  Always prompt for API key and store in localStorage.
-
-ChatBridge (window.ChatBridge — injected into every response):
-  ChatBridge.send(text)               // send a message as if the user typed it
-  ChatBridge.onMessage(fn(html,text)) // fires when the next AI response arrives
-  ChatBridge.getHistory(fn(history))  // get conversation history [{role,content}]
-
-Linking (use only when navigation feels natural — not required):
-  <a href="/slug" data-cb="Natural question">Link text</a>
-  Plain click → sends in current conversation. Shift/Cmd/middle-click → new tab, fresh context.`;
+  Always prompt for API key and store in localStorage.`;
 
 
   // ── CHAT BRIDGE — receive postMessage from iframe ─────────────
