@@ -66,7 +66,50 @@
       border: 1px solid var(--border);
       border-radius: 20px;
       padding: 3px 10px;
+      cursor: pointer;
+      transition: border-color 120ms, color 120ms;
     }
+    #model-badge:hover { border-color: #333; color: var(--text-dim); }
+
+    #model-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: #141414;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px;
+      min-width: 200px;
+      box-shadow: 0 12px 32px rgba(0,0,0,.5);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    #model-dropdown.hidden { display: none; }
+
+    .model-group-label {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      padding: 6px 8px 3px;
+    }
+    .model-opt {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 8px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 100ms, color 100ms;
+    }
+    .model-opt:hover { background: #1e1e1e; color: var(--text); }
+    .model-opt.active { color: #93c5fd; background: rgba(37,99,235,0.12); }
 
     .top-btn {
       width: 28px; height: 28px;
@@ -449,7 +492,21 @@
   <div id="top-bar">
     <h1>HTML Chat</h1>
     <div style="display:flex;align-items:center;gap:8px;">
-      <span id="model-badge">claude-opus-4-7</span>
+      <div id="model-picker" style="position:relative;">
+        <button id="model-badge" title="Switch model">claude-opus-4-7 ▾</button>
+        <div id="model-dropdown" class="hidden">
+          <div class="model-group-label">Anthropic</div>
+          <button class="model-opt active" data-provider="anthropic" data-model="claude-opus-4-7">claude-opus-4-7</button>
+          <button class="model-opt" data-provider="anthropic" data-model="claude-sonnet-4-6">claude-sonnet-4-6</button>
+          <div class="model-group-label">DeepSeek</div>
+          <button class="model-opt" data-provider="deepseek" data-model="deepseek-chat">DeepSeek V4 (Chat)</button>
+          <button class="model-opt" data-provider="deepseek" data-model="deepseek-reasoner">DeepSeek V4 (Reasoner)</button>
+          <div class="model-group-label">OpenRouter</div>
+          <button class="model-opt" data-provider="openrouter" data-model="google/gemini-2.5-pro">Gemini 2.5 Pro</button>
+          <button class="model-opt" data-provider="openrouter" data-model="meta-llama/llama-4-maverick">Llama 4 Maverick</button>
+          <button class="model-opt" data-provider="openrouter" data-model="x-ai/grok-3">Grok 3</button>
+        </div>
+      </div>
       <button class="top-btn" id="new-chat-btn" title="New conversation">
         <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
@@ -513,10 +570,9 @@
     </div>
     <h2>Enter your API key</h2>
     <p>
-      HTML Chat uses the Anthropic API directly in your browser. Your key is stored only in
+      Your <span id="modal-provider-name">Anthropic</span> API key is stored only in
       <code style="font-family:var(--font-mono);font-size:11px;color:#93c5fd;">localStorage</code>
-      and never sent anywhere except Anthropic's servers.<br><br>
-      Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+      and sent only to the provider's servers.
     </p>
     <label class="modal-label" for="api-key-input">Anthropic API Key</label>
     <input id="api-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false" />
@@ -638,11 +694,18 @@ draw();
 (function () {
   'use strict';
 
+  const PROVIDERS = {
+    anthropic:  { name: 'Anthropic',  keyStorageKey: 'htmlchat_api_key',          placeholder: 'sk-ant-api03-...' },
+    deepseek:   { name: 'DeepSeek',   keyStorageKey: 'htmlchat_deepseek_key',     placeholder: 'sk-...' },
+    openrouter: { name: 'OpenRouter', keyStorageKey: 'htmlchat_openrouter_key',   placeholder: 'sk-or-...' },
+  };
+
   const state = {
     apiKey: '',
+    provider: 'anthropic',
     model: 'claude-opus-4-7',
     conversation: [],
-    responses: [],       // { html, timestamp }[]
+    responses: [],
     isStreaming: false,
     maximizedHtml: '',
   };
@@ -664,6 +727,8 @@ draw();
   const maxCopyBtn    = $('max-copy-btn');
   const maxOpenBtn    = $('max-open-btn');
   const maxCloseBtn   = $('max-close-btn');
+  const modelBadge    = $('model-badge');
+  const modelDropdown = $('model-dropdown');
 
   const SYSTEM_PROMPT = `You are an AI assistant that ALWAYS responds with complete, self-contained HTML documents.
 
@@ -780,6 +845,44 @@ about at least 3 more things, and clicking any of them should feel instant and m
     return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
+  // ── MODEL PICKER ──────────────────────────────────────────────
+  function setupModelPicker() {
+    modelBadge.addEventListener('click', e => {
+      e.stopPropagation();
+      modelDropdown.classList.toggle('hidden');
+    });
+    document.addEventListener('click', () => modelDropdown.classList.add('hidden'));
+
+    modelDropdown.querySelectorAll('.model-opt').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const provider = btn.dataset.provider;
+        const model = btn.dataset.model;
+        state.provider = provider;
+        state.model = model;
+        modelBadge.textContent = btn.textContent.trim() + ' ▾';
+        modelDropdown.querySelectorAll('.model-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        modelDropdown.classList.add('hidden');
+        // Check if we have a key for this provider
+        const key = localStorage.getItem(PROVIDERS[provider].keyStorageKey);
+        if (key) {
+          state.apiKey = key;
+        } else {
+          updateModalForProvider();
+          showModal();
+        }
+      });
+    });
+  }
+
+  function updateModalForProvider() {
+    const p = PROVIDERS[state.provider];
+    $('modal-provider-name').textContent = p.name;
+    apiKeyInput.placeholder = p.placeholder;
+    apiKeyInput.value = localStorage.getItem(p.keyStorageKey) || '';
+  }
+
   // ── INIT ──────────────────────────────────────────────────────
   function init() {
     const savedKey = localStorage.getItem('htmlchat_api_key');
@@ -793,6 +896,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
     setupModal();
     setupMaximize();
     setupNewChat();
+    setupModelPicker();
 
     // Auto-send topic from URL path after a short delay
     const topic = topicFromPath();
@@ -822,7 +926,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
     modalSubmit.addEventListener('click', submitKey);
     apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitKey(); });
     settingsBtn.addEventListener('click', () => {
-      apiKeyInput.value = state.apiKey || '';
+      updateModalForProvider();
       modalError.classList.remove('visible');
       showModal();
     });
@@ -833,7 +937,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
     if (!key) { showError('Please enter your API key.'); return; }
     if (!key.startsWith('sk-')) { showError('API key should start with "sk-".'); return; }
     state.apiKey = key;
-    localStorage.setItem('htmlchat_api_key', key);
+    localStorage.setItem(PROVIDERS[state.provider].keyStorageKey, key);
     modalError.classList.remove('visible');
     hideModal();
   }
@@ -979,24 +1083,50 @@ about at least 3 more things, and clicking any of them should feel instant and m
     }
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': state.apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: state.model,
-          max_tokens: 16000,
-          thinking: { type: 'adaptive' },
-          output_config: { effort: 'medium' },
-          stream: true,
-          system: SYSTEM_PROMPT,
-          messages: state.conversation,
-        }),
-      });
+      // Build request per provider
+      let res;
+      if (state.provider === 'anthropic') {
+        res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': state.apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: state.model,
+            max_tokens: 16000,
+            thinking: { type: 'adaptive' },
+            output_config: { effort: 'medium' },
+            stream: true,
+            system: SYSTEM_PROMPT,
+            messages: state.conversation,
+          }),
+        });
+      } else {
+        // OpenAI-compatible: DeepSeek + OpenRouter
+        const baseUrl = state.provider === 'deepseek'
+          ? 'https://api.deepseek.com/v1'
+          : 'https://openrouter.ai/api/v1';
+        res = await fetch(baseUrl + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + state.apiKey,
+            ...(state.provider === 'openrouter' ? { 'HTTP-Referer': location.origin } : {}),
+          },
+          body: JSON.stringify({
+            model: state.model,
+            max_tokens: 16000,
+            stream: true,
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              ...state.conversation,
+            ],
+          }),
+        });
+      }
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -1005,13 +1135,12 @@ about at least 3 more things, and clicking any of them should feel instant and m
 
       wrap.classList.add('streaming');
       statusDot.classList.add('streaming');
-      statusLabel.textContent = 'Thinking...';
+      statusLabel.textContent = state.provider === 'anthropic' ? 'Thinking...' : 'Rendering...';
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
       let thinkingText = '';
-      let isThinking = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1027,37 +1156,30 @@ about at least 3 more things, and clicking any of them should feel instant and m
           let ev;
           try { ev = JSON.parse(data); } catch { continue; }
 
-          // Track when a thinking block starts/ends
-          if (ev.type === 'content_block_start') {
-            isThinking = ev.content_block?.type === 'thinking';
-            console.log('[block_start]', ev.content_block?.type);
-          }
-          if (ev.type === 'content_block_stop') {
-            isThinking = false;
-          }
-          if (ev.type === 'message_start') {
-            console.log('[message_start]', JSON.stringify(ev.message?.usage));
-          }
-
-          if (ev.type === 'content_block_delta') {
-            // Thinking text — render live in the iframe
-            if (ev.delta?.type === 'thinking_delta') {
-              thinkingText += ev.delta.thinking;
-              liveRenderToIframe(thinkingIframeHtml(thinkingText));
-              statusLabel.textContent = 'Thinking...';
-              console.log('[thinking]', ev.delta.thinking.slice(0, 60));
+          if (state.provider === 'anthropic') {
+            // Anthropic SSE events
+            if (ev.type === 'content_block_start') {
+              if (ev.content_block?.type === 'thinking') statusLabel.textContent = 'Thinking...';
             }
-            // HTML response text
-            if (ev.delta?.type === 'text_delta') {
-              if (statusLabel.textContent === 'Thinking...') {
-                statusLabel.textContent = 'Rendering...';
+            if (ev.type === 'content_block_delta') {
+              if (ev.delta?.type === 'thinking_delta') {
+                thinkingText += ev.delta.thinking;
+                liveRenderToIframe(thinkingIframeHtml(thinkingText));
               }
-              accumulated += ev.delta.text;
+              if (ev.delta?.type === 'text_delta') {
+                if (statusLabel.textContent === 'Thinking...') statusLabel.textContent = 'Rendering...';
+                accumulated += ev.delta.text;
+                const liveHtml = extractHtml(accumulated);
+                if (liveHtml) { state.responses[responseIndex].html = liveHtml; throttledRender(liveHtml); }
+              }
+            }
+          } else {
+            // OpenAI-compatible SSE (DeepSeek / OpenRouter)
+            const delta = ev.choices?.[0]?.delta?.content;
+            if (delta) {
+              accumulated += delta;
               const liveHtml = extractHtml(accumulated);
-              if (liveHtml) {
-                state.responses[responseIndex].html = liveHtml;
-                throttledRender(liveHtml);
-              }
+              if (liveHtml) { state.responses[responseIndex].html = liveHtml; throttledRender(liveHtml); }
             }
           }
         }
