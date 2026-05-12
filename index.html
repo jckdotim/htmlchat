@@ -1162,6 +1162,8 @@ Linking (use only when navigation feels natural — not required):
     const abortController = new AbortController();
     state.abortController = abortController;
 
+    const appendThinkingChunk = makeThinkingAppender(iframe);
+
     let accumulated = '';
 
     // During streaming: document.write for live preview (fast, no full reload).
@@ -1301,15 +1303,17 @@ Linking (use only when navigation feels natural — not required):
                   if (!htmlRevealed && isHtmlReadyToReveal(liveHtml)) {
                     htmlRevealed = true;
                     statusLabel.textContent = 'Rendering...';
-                    // Fade out thinking view, write content while invisible, then fade in
+                    // Fade out thinking, load content via srcdoc (no white flash), then fade in
                     iframe.style.transition = 'opacity 0.3s ease';
                     iframe.style.opacity = '0';
                     setTimeout(() => {
-                      liveRenderToIframe(liveHtml);
-                      requestAnimationFrame(() => {
-                        iframe.style.opacity = '1';
-                        setTimeout(() => { iframe.style.transition = ''; }, 320);
-                      });
+                      iframe.addEventListener('load', () => {
+                        requestAnimationFrame(() => {
+                          iframe.style.opacity = '1';
+                          setTimeout(() => { iframe.style.transition = ''; }, 320);
+                        });
+                      }, { once: true });
+                      iframe.srcdoc = liveHtml;
                     }, 300);
                   } else if (htmlRevealed) {
                     throttledRender(liveHtml);
@@ -1331,11 +1335,13 @@ Linking (use only when navigation feels natural — not required):
                   iframe.style.transition = 'opacity 0.3s ease';
                   iframe.style.opacity = '0';
                   setTimeout(() => {
-                    liveRenderToIframe(liveHtml);
-                    requestAnimationFrame(() => {
-                      iframe.style.opacity = '1';
-                      setTimeout(() => { iframe.style.transition = ''; }, 320);
-                    });
+                    iframe.addEventListener('load', () => {
+                      requestAnimationFrame(() => {
+                        iframe.style.opacity = '1';
+                        setTimeout(() => { iframe.style.transition = ''; }, 320);
+                      });
+                    }, { once: true });
+                    iframe.srcdoc = liveHtml;
                   }, 300);
                 } else if (htmlRevealed) {
                   throttledRender(liveHtml);
@@ -1564,12 +1570,33 @@ Linking (use only when navigation feels natural — not required):
       + '</body></html>';
   }
 
-  // Push new thinking delta into the already-loaded thinking iframe via postMessage
-  function appendThinkingChunk(iframe, delta) {
-    const html = delta
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\n/g,'<br>');
-    try { iframe.contentWindow.postMessage({ type: 'tk:append', html }, '*'); } catch {}
+  // Push new thinking delta into the thinking iframe via postMessage.
+  // Queues messages until the iframe is ready, then flushes.
+  function makeThinkingAppender(iframe) {
+    let ready = false;
+    const queue = [];
+
+    function send(delta) {
+      const html = delta
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/\n/g,'<br>');
+      queue.push(html);
+      if (ready) flush();
+    }
+
+    function flush() {
+      while (queue.length) {
+        const html = queue.shift();
+        try { iframe.contentWindow.postMessage({ type: 'tk:append', html }, '*'); } catch {}
+      }
+    }
+
+    iframe.addEventListener('load', () => {
+      ready = true;
+      flush();
+    }, { once: true });
+
+    return send;
   }
 
   function fallbackHtml(raw) {
