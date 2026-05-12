@@ -879,6 +879,8 @@ about at least 3 more things, and clicking any of them should feel instant and m
         const model = btn.dataset.model;
         state.provider = provider;
         state.model = model;
+        localStorage.setItem('htmlchat_provider', provider);
+        localStorage.setItem('htmlchat_model', model);
         modelBadge.textContent = btn.textContent.trim() + ' ▾';
         modelDropdown.querySelectorAll('.model-opt').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -918,7 +920,20 @@ about at least 3 more things, and clicking any of them should feel instant and m
 
   // ── INIT ──────────────────────────────────────────────────────
   function init() {
-    const savedKey = localStorage.getItem('htmlchat_api_key');
+    // Restore last-used provider/model from localStorage
+    const savedProvider = localStorage.getItem('htmlchat_provider');
+    const savedModel = localStorage.getItem('htmlchat_model');
+    if (savedProvider && PROVIDERS[savedProvider]) {
+      state.provider = savedProvider;
+      state.model = savedModel || state.model;
+      // Sync active model-opt
+      document.querySelectorAll('.model-opt').forEach(b => {
+        b.classList.toggle('active', b.dataset.provider === savedProvider && b.dataset.model === state.model);
+      });
+      modelBadge.textContent = (document.querySelector('.model-opt.active')?.textContent.trim() || state.model) + ' ▾';
+    }
+
+    const savedKey = localStorage.getItem(PROVIDERS[state.provider].keyStorageKey);
     if (savedKey && savedKey.startsWith('sk-')) {
       state.apiKey = savedKey;
       hideModal();
