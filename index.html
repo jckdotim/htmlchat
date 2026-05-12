@@ -138,6 +138,40 @@
       50%      { box-shadow: inset 0 0 0 2px rgba(37,99,235,0.7); }
     }
 
+    /* Streaming overlay — sits on top of iframe, fades out on completion */
+    .streaming-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 96px;
+      pointer-events: none;
+      background: linear-gradient(to bottom, transparent, rgba(10,10,20,0.82));
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 12px;
+      opacity: 1;
+      transition: opacity 0.5s ease;
+      z-index: 10;
+    }
+    .streaming-overlay.hidden {
+      opacity: 0;
+    }
+    .streaming-overlay-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: rgba(148,163,255,0.7);
+      letter-spacing: .12em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .streaming-overlay-label .pulse-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #6366f1;
+      animation: dot-blink 1s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
     .bubble-iframe {
       width: 100%;
       height: 100%;
@@ -905,7 +939,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
     state.responses.push({ html: '', timestamp: new Date() });
 
     // Create the assistant bubble now (will be filled as we stream)
-    const { wrap, iframe, statusDot, statusLabel, maximizeBtn, copyBtn } =
+    const { wrap, iframe, overlay, statusDot, statusLabel, maximizeBtn, copyBtn } =
       appendAssistantBubble(responseIndex);
 
     let accumulated = '';
@@ -1042,6 +1076,8 @@ about at least 3 more things, and clicking any of them should feel instant and m
       statusLabel.textContent = 'Done · ' + formatTime(state.responses[responseIndex].timestamp);
       maximizeBtn.style.display = '';
       copyBtn.style.display = '';
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 500);
       broadcastResponse(state.responses[responseIndex].html, accumulated);
 
     } catch (err) {
@@ -1051,6 +1087,8 @@ about at least 3 more things, and clicking any of them should feel instant and m
       wrap.classList.remove('streaming');
       statusDot.classList.remove('streaming');
       statusLabel.textContent = 'Error: ' + err.message.slice(0, 60);
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 500);
       state.conversation.pop();
     } finally {
       state.isStreaming = false;
@@ -1087,6 +1125,11 @@ about at least 3 more things, and clicking any of them should feel instant and m
     iframe.srcdoc = thinkingHtml();
 
     wrap.appendChild(iframe);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'streaming-overlay';
+    overlay.innerHTML = '<div class="streaming-overlay-label"><span class="pulse-dot"></span>렌더링 중 — 일부 인터랙션이 동작하지 않을 수 있어요</div>';
+    wrap.appendChild(overlay);
 
     const toolbar = document.createElement('div');
     toolbar.className = 'bubble-toolbar';
@@ -1135,7 +1178,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
     messagesEl.appendChild(row);
     scrollBottom();
 
-    return { wrap, iframe, statusDot: dot, statusLabel: label, maximizeBtn, copyBtn };
+    return { wrap, iframe, overlay, statusDot: dot, statusLabel: label, maximizeBtn, copyBtn };
   }
 
   // ── HTML HELPERS ──────────────────────────────────────────────
