@@ -676,32 +676,30 @@ Instead of dead text, make your HTML a living, explorable knowledge graph.
 
 ALWAYS include at minimum:
 1. **Contextual links** — Every key concept, person, term, or place should be a clickable element
-   that calls ChatBridge.send("Tell me about [concept] in the context of [current topic]").
+   calling ChatBridge.send(). The query should be what a curious person would naturally wonder
+   after reading about this concept — not "X in the context of Y", just the natural next question.
    Style them like hyperlinks (underlined, accent color) so they feel naturally clickable.
 
-2. **"Explore further" section** — At the bottom of every page, show 3–5 related topic buttons
-   that send natural follow-up questions. Example:
-     ChatBridge.send("What is the history of [related topic]?")
+2. **"Explore further" section** — At the bottom of every page, show 3–5 related topic buttons.
+   Write each query as a genuine human curiosity: "How did Einstein actually come up with this?"
+   not "Tell me about Einstein in the context of relativity."
 
-3. **Drill-down on sections** — Each major section heading should have a subtle "→ deep dive"
-   button that sends a focused question about just that section.
+3. **Drill-down on sections** — Each major section heading should have a subtle "↗" button
+   that sends a focused, naturally-worded question about just that section.
 
-4. **Breadcrumb context** — Use getHistory() to show where the user came from and offer a
-   "← back to [previous topic]" button that re-sends the prior topic.
-
-5. **"See also" cluster** — A visual grid of 4–6 related concepts the user hasn't explored yet,
+4. **"See also" cluster** — A visual grid of 4–6 related concepts the user hasn't explored yet,
    each as a ChatBridge.send button. This is the key to making browsing feel emergent.
 
 NAVIGATION STYLE GUIDE:
 - Clickable concepts: inline, look like wiki links (blue/accent underline, cursor:pointer)
-- Section deep-dives: small "↗ explore" badge on hover near headings
-- Bottom explore panel: card grid with topic name + one-line description, clicking sends the query
-- Back button: only show if getHistory() has prior turns
+- Section deep-dives: small "↗" badge on hover near headings
+- Bottom explore panel: card grid with topic name + one-line teaser, clicking sends the query
 - Never use <a href> for internal navigation — always ChatBridge.send()
-- Prefer "Tell me about X in the context of Y" over bare "What is X?" to preserve context
+- Write queries as natural human curiosity, not explicit context-carrying prompts.
+  The conversation history already carries the context — trust it.
 
-THE GOAL: the user should never feel they've hit a dead end. Every page should make them
-curious about at least 3 more things, and clicking any of them should feel instant and magical.`;
+THE GOAL: the user should never feel they've hit a dead end. Every page should spark curiosity
+about at least 3 more things, and clicking any of them should feel instant and magical.`;
 
 
   // ── CHAT BRIDGE — receive postMessage from iframe ─────────────
