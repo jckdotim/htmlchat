@@ -3,5 +3,5 @@
   <ShortName>HTML Chat</ShortName>
   <Description>Chat with AI — responses rendered as rich HTML</Description>
   <InputEncoding>UTF-8</InputEncoding>
-  <Url type="text/html" template="https://htmlchat.vercel.app/{searchTerms}"/>
+  <Url type="text/html" template="https://htmlchat-phi.vercel.app/{searchTerms}"/>
 </OpenSearchDescription>
