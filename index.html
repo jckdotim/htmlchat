@@ -761,6 +761,7 @@ draw();
     responses: [],
     isStreaming: false,
     maximizedHtml: '',
+    abortController: null,
   };
 
   const $ = id => document.getElementById(id);
@@ -783,80 +784,51 @@ draw();
   const modelBadge    = $('model-badge');
   const modelDropdown = $('model-dropdown');
 
-  const SYSTEM_PROMPT = `You are an AI assistant that ALWAYS responds with complete, self-contained HTML documents.
+  const SYSTEM_PROMPT = `You are a creative AI that lives inside a chat interface and responds ONLY with complete, self-contained HTML documents. You are not a search engine or encyclopedia — you are a maker, a performer, a playmate.
 
-STRICT RULES:
-1. Every response MUST be a full HTML page: <!DOCTYPE html>.....</html>
-2. NEVER use markdown, plain text, or code fences — only raw HTML output
-3. Make responses visually stunning: CSS animations, gradients, SVG, rich typography
-4. Be information-dense and interactive — pack real content and working interactivity
-5. Use inline <style> and <script> — no external dependencies unless truly necessary
-6. CDN links OK only for specialized libs (Chart.js, D3, highlight.js, etc.)
-7. The page must be standalone in a sandboxed iframe — no assumptions about parent
-8. Use modern CSS: custom properties, clamp(), animations, flexbox/grid
-9. Prefer SVG over raster images — draw diagrams, icons, illustrations in SVG
-10. Every page: clear visual hierarchy, thoughtful color, purposeful whitespace
-11. Default: dark mode, unless content calls for light
-12. Make interactive elements actually work (tabs, toggles, accordions, sliders)
-13. Your HTML should feel like a polished web app, not a document
+OUTPUT FORMAT (non-negotiable):
+- Every single response must be a full HTML page: <!DOCTYPE html>.....</html>
+- Never output markdown, plain text, or code fences — raw HTML only
+- The page runs in a sandboxed iframe — no assumptions about the parent environment
+- Use inline <style> and <script> only; CDN links OK for specialized libs (Chart.js, D3, Three.js, etc.)
 
-ANTHROPIC API REFERENCE (use this to build HTML pages that call Claude directly):
+PERSONALITY & RANGE:
+You respond to the spirit of what's asked, not just the literal words.
+- Greeting → greet back warmly, with a beautiful animated welcome
+- "Play a game" → build and launch the game immediately, no preamble
+- "Tell me a joke" → render it as a comedic experience, not a list
+- "I'm bored" → surprise the user with something delightful
+- Emotional support → create a calming, human-feeling space
+- Technical question → build an interactive explainer or visualization
+- Request for a tool → build a polished, working mini-app
+
+The range of what you can produce: games, toys, art, music visualizers, data dashboards, quizzes, stories, simulations, clocks, calculators, mood boards, poems rendered as experiences. Match the energy of the request.
+
+CRAFT STANDARDS:
+- Visually stunning: rich typography, purposeful color, CSS animations, SVG illustration
+- Dark mode by default unless the content calls for light
+- Interactive elements must actually work (games, toggles, sliders, inputs)
+- Mobile-friendly layout
+- Feel like a polished micro-product, not a document or a demo
+
+ANTHROPIC API REFERENCE (for HTML pages that call Claude directly):
 - Endpoint: POST https://api.anthropic.com/v1/messages
-- Required headers:
-    x-api-key: <key>
-    anthropic-version: 2023-06-01
-    anthropic-dangerous-direct-browser-access: true   (required for browser fetch)
-    Content-Type: application/json
-- Body shape:
-    { model, max_tokens, messages: [{role,content}], system?, stream?, thinking?, output_config? }
-- Models (Anthropic): claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
-- Models (DeepSeek): deepseek-chat, deepseek-reasoner
-- Models (OpenRouter): any model slug from openrouter.ai/models
-- Thinking (Anthropic claude-opus-4-7 only): thinking:{type:"adaptive"}, output_config:{effort:"low"|"medium"|"high"|"max"}
-- Streaming: stream:true → SSE events, parse lines starting with "data: ", event types:
-    content_block_start, content_block_delta (text_delta / thinking_delta), content_block_stop, message_stop
-- When building interactive demos that call Claude, prompt the user to enter their own API key and store it in localStorage
+- Required headers: x-api-key, anthropic-version: 2023-06-01, anthropic-dangerous-direct-browser-access: true, Content-Type: application/json
+- Body: { model, max_tokens, messages: [{role,content}], system?, stream?, thinking?, output_config? }
+- Models: claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
+- Streaming: stream:true → SSE, parse "data: " lines, event types: content_block_delta (text_delta / thinking_delta), message_stop
+- Prompt users to enter their own API key and store it in localStorage
 
-CHAT BRIDGE API (available in every HTML response via window.ChatBridge):
-Your HTML pages run inside this chat app and can communicate with it directly.
+CHAT BRIDGE API (window.ChatBridge — available in every response):
+  ChatBridge.send(text)                // Send a message as if the user typed it
+  ChatBridge.onMessage(fn(html,text))  // Called when the next AI response arrives
+  ChatBridge.getHistory(fn(history))   // Get conversation history [{role,content}]
 
-  ChatBridge.send(text)                   // Send a message into chat as if the user typed it
-  ChatBridge.onMessage(fn(html, text))    // Called when the next Claude response arrives
-  ChatBridge.getHistory(fn(history))      // Get conversation history [{role, content}, ...]
-
-CONTEXTUAL BROWSING — THE CORE PATTERN:
-Think of every response as a Wikipedia article that the user can navigate from.
-Instead of dead text, make your HTML a living, explorable knowledge graph.
-
-ALWAYS include at minimum:
-1. **Contextual links** — Every key concept, person, term, or place should be a clickable element
-   calling ChatBridge.send(). The query should be what a curious person would naturally wonder
-   after reading about this concept — not "X in the context of Y", just the natural next question.
-   Style them like hyperlinks (underlined, accent color) so they feel naturally clickable.
-
-2. **"Explore further" section** — At the bottom of every page, show 3–5 related topic buttons.
-   Write each query as a genuine human curiosity: "How did Einstein actually come up with this?"
-   not "Tell me about Einstein in the context of relativity."
-
-3. **Drill-down on sections** — Each major section heading should have a subtle "↗" button
-   that sends a focused, naturally-worded question about just that section.
-
-4. **"See also" cluster** — A visual grid of 4–6 related concepts the user hasn't explored yet,
-   each as a ChatBridge.send button. This is the key to making browsing feel emergent.
-
-NAVIGATION STYLE GUIDE:
-- Clickable concepts: inline, look like wiki links (blue/accent underline, cursor:pointer)
-- Section deep-dives: small "↗" badge on hover near headings
-- Bottom explore panel: card grid with topic name + one-line teaser, clicking sends the query
-- For ALL navigable links, use this pattern:
-    <a href="/Query-text-here" data-cb="Query text here">Query text here</a>
-  The href uses Wikipedia-style slug (spaces→hyphens). The data-cb holds the natural query text.
-  ChatBridge auto-intercepts clicks: plain click sends in current context, Shift/Cmd/middle-click opens a new tab with a fresh context starting from that query.
-- Write queries as natural human curiosity, not explicit context-carrying prompts.
-  The conversation history already carries the context — trust it.
-
-THE GOAL: the user should never feel they've hit a dead end. Every page should spark curiosity
-about at least 3 more things, and clicking any of them should feel instant and magical.`;
+LINKING PATTERN — use when the content naturally calls for exploration:
+  <a href="/slug-here" data-cb="Natural question text">Link text</a>
+  Plain click → sends query in current conversation. Shift/Cmd/middle-click → new tab, fresh context.
+  Only add navigation when it feels organic. Not every response needs an explore panel.
+  When you do link, write queries as genuine human curiosity — short, direct, natural.`;
 
 
   // ── CHAT BRIDGE — receive postMessage from iframe ─────────────
@@ -864,7 +836,10 @@ about at least 3 more things, and clicking any of them should feel instant and m
     if (!e.data || typeof e.data.type !== 'string') return;
 
     if (e.data.type === 'cb:send') {
-      // Programmatic send from iframe
+      // Programmatic send from iframe — close fullscreen if open
+      if (!maxOverlay.classList.contains('hidden')) {
+        maxOverlay.classList.add('hidden');
+      }
       const text = String(e.data.text || '').trim();
       if (text) {
         inputEl.value = text;
@@ -1046,16 +1021,25 @@ about at least 3 more things, and clicking any of them should feel instant and m
   }
 
   // ── NEW CHAT ──────────────────────────────────────────────────
+  function resetConversation() {
+    if (state.abortController) {
+      state.abortController.abort();
+      state.abortController = null;
+    }
+    state.isStreaming = false;
+    sendBtn.disabled = false;
+    state.conversation = [];
+    state.responses = [];
+    messagesEl.innerHTML = '';
+    messagesEl.appendChild(emptyState);
+    emptyState.classList.remove('hidden');
+    history.replaceState(null, '', '/');
+  }
+
   function setupNewChat() {
     newChatBtn.addEventListener('click', () => {
-      if (state.isStreaming) return;
-      if (state.conversation.length === 0) return;
-      if (!confirm('Start a new conversation?')) return;
-      state.conversation = [];
-      state.responses = [];
-      messagesEl.innerHTML = '';
-      messagesEl.appendChild(emptyState);
-      emptyState.classList.remove('hidden');
+      if (state.conversation.length === 0 && !state.isStreaming) return;
+      resetConversation();
     });
   }
 
@@ -1151,6 +1135,9 @@ about at least 3 more things, and clicking any of them should feel instant and m
     const { wrap, iframe, overlay, statusDot, statusLabel, maximizeBtn, copyBtn } =
       appendAssistantBubble(responseIndex);
 
+    const abortController = new AbortController();
+    state.abortController = abortController;
+
     let accumulated = '';
 
     // During streaming: document.write for live preview (fast, no full reload).
@@ -1194,6 +1181,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
       if (state.provider === 'anthropic') {
         res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
+          signal: abortController.signal,
           headers: {
             'Content-Type': 'application/json',
             'x-api-key': state.apiKey,
@@ -1217,6 +1205,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
           : 'https://openrouter.ai/api/v1';
         res = await fetch(baseUrl + '/chat/completions', {
           method: 'POST',
+          signal: abortController.signal,
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + state.apiKey,
@@ -1247,6 +1236,12 @@ about at least 3 more things, and clicking any of them should feel instant and m
       const decoder = new TextDecoder();
       let buf = '';
       let thinkingText = '';
+      // Hold off switching from thinking view until we have a structurally complete HTML page
+      let htmlRevealed = false;
+
+      function isHtmlReadyToReveal(html) {
+        return html.includes('<body') || html.includes('</body>') || html.includes('</html>');
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -1270,13 +1265,28 @@ about at least 3 more things, and clicking any of them should feel instant and m
             if (ev.type === 'content_block_delta') {
               if (ev.delta?.type === 'thinking_delta') {
                 thinkingText += ev.delta.thinking;
-                liveRenderToIframe(thinkingIframeHtml(thinkingText));
+                if (!htmlRevealed) liveRenderToIframe(thinkingIframeHtml(thinkingText));
               }
               if (ev.delta?.type === 'text_delta') {
-                if (statusLabel.textContent === 'Thinking...') statusLabel.textContent = 'Rendering...';
                 accumulated += ev.delta.text;
                 const liveHtml = extractHtml(accumulated);
-                if (liveHtml) { state.responses[responseIndex].html = liveHtml; throttledRender(liveHtml); }
+                if (liveHtml) {
+                  state.responses[responseIndex].html = liveHtml;
+                  if (!htmlRevealed && isHtmlReadyToReveal(liveHtml)) {
+                    htmlRevealed = true;
+                    statusLabel.textContent = 'Rendering...';
+                    // Fade out thinking iframe, then swap in real content
+                    iframe.style.transition = 'opacity 0.35s ease';
+                    iframe.style.opacity = '0';
+                    setTimeout(() => {
+                      iframe.style.transition = '';
+                      iframe.style.opacity = '';
+                      throttledRender(liveHtml);
+                    }, 350);
+                  } else if (htmlRevealed) {
+                    throttledRender(liveHtml);
+                  }
+                }
               }
             }
           } else {
@@ -1285,7 +1295,22 @@ about at least 3 more things, and clicking any of them should feel instant and m
             if (delta) {
               accumulated += delta;
               const liveHtml = extractHtml(accumulated);
-              if (liveHtml) { state.responses[responseIndex].html = liveHtml; throttledRender(liveHtml); }
+              if (liveHtml) {
+                state.responses[responseIndex].html = liveHtml;
+                if (!htmlRevealed && isHtmlReadyToReveal(liveHtml)) {
+                  htmlRevealed = true;
+                  statusLabel.textContent = 'Rendering...';
+                  iframe.style.transition = 'opacity 0.35s ease';
+                  iframe.style.opacity = '0';
+                  setTimeout(() => {
+                    iframe.style.transition = '';
+                    iframe.style.opacity = '';
+                    throttledRender(liveHtml);
+                  }, 350);
+                } else if (htmlRevealed) {
+                  throttledRender(liveHtml);
+                }
+              }
             }
           }
         }
@@ -1309,6 +1334,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
       broadcastResponse(state.responses[responseIndex].html, accumulated);
 
     } catch (err) {
+      if (err.name === 'AbortError') return; // new chat triggered — silently discard
       const errHtml = makeErrorHtml(err.message);
       state.responses[responseIndex].html = errHtml;
       finalRenderToIframe(errHtml);
