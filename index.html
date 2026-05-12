@@ -186,9 +186,8 @@
     .streaming-overlay {
       position: absolute;
       bottom: 0; left: 0; right: 0;
-      height: 96px;
+      height: 120px;
       pointer-events: none;
-      background: linear-gradient(to bottom, transparent, rgba(10,10,20,0.82));
       display: flex;
       align-items: flex-end;
       justify-content: center;
@@ -196,6 +195,28 @@
       opacity: 1;
       transition: opacity 0.5s ease;
       z-index: 10;
+      background: linear-gradient(to bottom,
+        transparent 0%,
+        rgba(10,10,30,0.5) 40%,
+        rgba(10,10,30,0.88) 100%);
+    }
+    .streaming-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        120deg,
+        transparent 20%,
+        rgba(99,102,241,0.12) 40%,
+        rgba(139,92,246,0.10) 55%,
+        transparent 75%
+      );
+      background-size: 200% 100%;
+      animation: grad-sweep 2.2s ease-in-out infinite;
+    }
+    @keyframes grad-sweep {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
     }
     .streaming-overlay.hidden {
       opacity: 0;
@@ -222,6 +243,7 @@
       border: none;
       display: block;
       background: #0f0f0f;
+      color-scheme: dark;
     }
 
     /* Bubble toolbar */
@@ -784,7 +806,9 @@ draw();
   const modelBadge    = $('model-badge');
   const modelDropdown = $('model-dropdown');
 
-  const SYSTEM_PROMPT = `You are a creative AI that lives inside a chat interface and responds ONLY with complete, self-contained HTML documents. You are not a search engine or encyclopedia — you are a maker, a performer, a playmate.
+  const SYSTEM_PROMPT = `PERFORMANCE: Always begin your response with <!DOCTYPE html> immediately. Do not plan or outline before writing — stream the HTML structure first. Add styles and interactivity inline as you go. The user sees your output in real-time.
+
+You are a creative AI that lives inside a chat interface and responds ONLY with complete, self-contained HTML documents. You are not a search engine or encyclopedia — you are a maker, a performer, a playmate.
 
 OUTPUT FORMAT (non-negotiable):
 - Every single response must be a full HTML page: <!DOCTYPE html>.....</html>
@@ -1235,12 +1259,15 @@ LINKING PATTERN — use when the content naturally calls for exploration:
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
-      let thinkingText = '';
       // Hold off switching from thinking view until we have a structurally complete HTML page
       let htmlRevealed = false;
 
       function isHtmlReadyToReveal(html) {
-        return html.includes('<body') || html.includes('</body>') || html.includes('</html>');
+        // Wait until there's actual content inside <body>, not just the opening tag
+        const bodyIdx = html.indexOf('<body');
+        if (bodyIdx === -1) return false;
+        const afterBody = html.slice(bodyIdx);
+        return afterBody.includes('</') || afterBody.includes('/>') || afterBody.length > 120;
       }
 
       while (true) {
@@ -1264,8 +1291,7 @@ LINKING PATTERN — use when the content naturally calls for exploration:
             }
             if (ev.type === 'content_block_delta') {
               if (ev.delta?.type === 'thinking_delta') {
-                thinkingText += ev.delta.thinking;
-                if (!htmlRevealed) liveRenderToIframe(thinkingIframeHtml(thinkingText));
+                if (!htmlRevealed) appendThinkingChunk(iframe, ev.delta.thinking);
               }
               if (ev.delta?.type === 'text_delta') {
                 accumulated += ev.delta.text;
@@ -1275,14 +1301,16 @@ LINKING PATTERN — use when the content naturally calls for exploration:
                   if (!htmlRevealed && isHtmlReadyToReveal(liveHtml)) {
                     htmlRevealed = true;
                     statusLabel.textContent = 'Rendering...';
-                    // Fade out thinking iframe, then swap in real content
-                    iframe.style.transition = 'opacity 0.35s ease';
+                    // Fade out thinking view, write content while invisible, then fade in
+                    iframe.style.transition = 'opacity 0.3s ease';
                     iframe.style.opacity = '0';
                     setTimeout(() => {
-                      iframe.style.transition = '';
-                      iframe.style.opacity = '';
-                      throttledRender(liveHtml);
-                    }, 350);
+                      liveRenderToIframe(liveHtml);
+                      requestAnimationFrame(() => {
+                        iframe.style.opacity = '1';
+                        setTimeout(() => { iframe.style.transition = ''; }, 320);
+                      });
+                    }, 300);
                   } else if (htmlRevealed) {
                     throttledRender(liveHtml);
                   }
@@ -1300,13 +1328,15 @@ LINKING PATTERN — use when the content naturally calls for exploration:
                 if (!htmlRevealed && isHtmlReadyToReveal(liveHtml)) {
                   htmlRevealed = true;
                   statusLabel.textContent = 'Rendering...';
-                  iframe.style.transition = 'opacity 0.35s ease';
+                  iframe.style.transition = 'opacity 0.3s ease';
                   iframe.style.opacity = '0';
                   setTimeout(() => {
-                    iframe.style.transition = '';
-                    iframe.style.opacity = '';
-                    throttledRender(liveHtml);
-                  }, 350);
+                    liveRenderToIframe(liveHtml);
+                    requestAnimationFrame(() => {
+                      iframe.style.opacity = '1';
+                      setTimeout(() => { iframe.style.transition = ''; }, 320);
+                    });
+                  }, 300);
                 } else if (htmlRevealed) {
                   throttledRender(liveHtml);
                 }
@@ -1376,7 +1406,7 @@ LINKING PATTERN — use when the content naturally calls for exploration:
     iframe.className = 'bubble-iframe';
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
     iframe.title = 'HTML Preview';
-    iframe.srcdoc = thinkingHtml();
+    iframe.srcdoc = thinkingIframeHtml();
 
     wrap.appendChild(iframe);
 
@@ -1500,10 +1530,7 @@ LINKING PATTERN — use when the content naturally calls for exploration:
     return document.getElementById('thinking-template').textContent;
   }
 
-  function thinkingIframeHtml(text) {
-    const escaped = text
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\n/g,'<br>');
+  function thinkingIframeHtml() {
     return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
       + 'html,body{margin:0;height:100%;background:#07070f;color:#a0a8d0;font-family:"JetBrains Mono","Fira Code",ui-monospace,monospace;font-size:11.5px;line-height:1.7;overflow:hidden;}'
       + '#wrap{position:fixed;inset:0;display:flex;flex-direction:column;}'
@@ -1516,13 +1543,33 @@ LINKING PATTERN — use when the content naturally calls for exploration:
       + '#content::-webkit-scrollbar{width:3px;}'
       + '#content::-webkit-scrollbar-thumb{background:#1e1e3a;border-radius:2px;}'
       + '.cursor{display:inline-block;width:7px;height:13px;background:#6366f1;animation:blink 1s step-end infinite;vertical-align:text-bottom;margin-left:2px;}'
+      + '.chunk{display:block;animation:slideUp 0.25s cubic-bezier(0.22,1,0.36,1) both;}'
+      + '@keyframes slideUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}'
       + '</style></head><body>'
       + '<div id="wrap">'
       + '<div id="header"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="hdr-label">thinking</span></div>'
-      + '<div id="content">' + escaped + '<span class="cursor"></span></div>'
+      + '<div id="content"><span class="cursor" id="cur"></span></div>'
       + '</div>'
-      + '<script>var c=document.getElementById("content");c.scrollTop=c.scrollHeight;<\/script>'
+      + '<script>'
+      + 'var content=document.getElementById("content"),cur=document.getElementById("cur");'
+      + 'window.addEventListener("message",function(e){'
+      + '  if(!e.data||e.data.type!=="tk:append")return;'
+      + '  var span=document.createElement("span");'
+      + '  span.className="chunk";'
+      + '  span.innerHTML=e.data.html;'
+      + '  content.insertBefore(span,cur);'
+      + '  content.scrollTop=content.scrollHeight;'
+      + '});'
+      + '<\/script>'
       + '</body></html>';
+  }
+
+  // Push new thinking delta into the already-loaded thinking iframe via postMessage
+  function appendThinkingChunk(iframe, delta) {
+    const html = delta
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\n/g,'<br>');
+    try { iframe.contentWindow.postMessage({ type: 'tk:append', html }, '*'); } catch {}
   }
 
   function fallbackHtml(raw) {
