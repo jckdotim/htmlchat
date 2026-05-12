@@ -36,7 +36,7 @@
     #app {
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      height: 100dvh;
       max-width: 820px;
       margin: 0 auto;
     }
@@ -497,6 +497,41 @@
       padding: 0 4px;
     }
     .msg-row.user .msg-time { text-align: right; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 600px) {
+      #app { height: 100dvh; }
+
+      #top-bar { padding: 10px 14px; }
+      #top-bar h1 { font-size: 13px; }
+
+      /* Hide model badge text on very narrow screens, show only ▾ */
+      #model-badge { font-size: 9px; padding: 3px 8px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+      #messages { padding: 16px 12px 8px; gap: 12px; }
+
+      .bubble-user { max-width: 88%; font-size: 13px; }
+
+      /* Shorter iframe on mobile — still scrollable inside */
+      .bubble-iframe-wrap { height: 280px; }
+
+      .bubble-toolbar { padding: 6px 8px; gap: 4px; flex-wrap: wrap; }
+      .tbtn { font-size: 9px; padding: 3px 6px; }
+
+      #input-area { padding: 10px 12px 14px; }
+      #input-wrapper { padding: 8px 10px; border-radius: 12px; }
+      #chat-input { font-size: 16px; /* prevent iOS zoom */ }
+
+      /* Maximize overlay — full screen, minimal padding */
+      #maximize-overlay { padding: 10px; gap: 8px; }
+      #maximize-toolbar { flex-wrap: wrap; gap: 6px; }
+      #maximize-toolbar-left { display: none; }
+      .max-btn { font-size: 10px; padding: 5px 10px; }
+
+      /* Modal full-width on mobile */
+      #modal { padding: 24px 20px; border-radius: 14px; }
+      #modal h2 { font-size: 18px; }
+    }
   </style>
 </head>
 <body>
