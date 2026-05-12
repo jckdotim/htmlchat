@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTML Chat</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --bg-panel: #141414;
+      --bg-input: #191919;
+      --border: #252525;
+      --accent: #2563eb;
+      --accent-glow: rgba(37,99,235,0.2);
+      --text: #e8e8e8;
+      --text-dim: #6b7280;
+      --text-muted: #3f4451;
+      --user-bg: #2563eb;
+      --radius: 18px;
+      --font-mono: 'JetBrains Mono','Fira Code',ui-monospace,monospace;
+      --font: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── LAYOUT ── */
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      max-width: 820px;
+      margin: 0 auto;
+    }
+
+    /* ── TOP BAR ── */
+    #top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #top-bar h1 {
+      font-size: 14px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    #model-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: #1a1a1a;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+    }
+
+    .top-btn {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 120ms, color 120ms, border-color 120ms;
+    }
+    .top-btn:hover { background: #1a1a1a; border-color: #333; color: var(--text-dim); }
+    .top-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── MESSAGES ── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+
+    .msg-row { display: flex; flex-direction: column; }
+    .msg-row.user { align-items: flex-end; }
+    .msg-row.assistant { align-items: flex-start; }
+
+    /* User bubble */
+    .bubble-user {
+      max-width: 72%;
+      background: var(--user-bg);
+      color: #fff;
+      padding: 10px 15px;
+      border-radius: 18px 18px 4px 18px;
+      font-size: 14px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    /* Assistant bubble — contains iframe */
+    .bubble-assistant {
+      width: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 4px 18px 18px 18px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Iframe inside bubble */
+    .bubble-iframe-wrap {
+      width: 100%;
+      height: 420px;
+      position: relative;
+      background: #fff;
+    }
+
+    .bubble-iframe-wrap.streaming {
+      animation: border-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes border-pulse {
+      0%,100% { box-shadow: inset 0 0 0 2px rgba(37,99,235,0.3); }
+      50%      { box-shadow: inset 0 0 0 2px rgba(37,99,235,0.7); }
+    }
+
+    .bubble-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+      background: #0f0f0f;
+    }
+
+    /* Bubble toolbar */
+    .bubble-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 10px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .bubble-toolbar-left {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #3f4451;
+      flex-shrink: 0;
+    }
+    .status-dot.streaming {
+      background: #22c55e;
+      animation: dot-blink 1s ease-in-out infinite;
+    }
+    @keyframes dot-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .tbtn {
+      display: flex; align-items: center; gap: 4px;
+      padding: 3px 8px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: #1a1a1a;
+      color: var(--text-dim);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+      white-space: nowrap;
+    }
+    .tbtn:hover { background: #222; color: var(--text); }
+    .tbtn svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .tbtn.copied { color: #4ade80; border-color: #14532d; background: #0f2a1a; }
+
+    /* Maximize button */
+    .tbtn-maximize {
+      background: var(--accent-glow);
+      border-color: rgba(37,99,235,0.4);
+      color: #93c5fd;
+    }
+    .tbtn-maximize:hover { background: rgba(37,99,235,0.3); color: #bfdbfe; }
+
+
+    /* ── INPUT AREA ── */
+    #input-area {
+      border-top: 1px solid var(--border);
+      padding: 14px 20px 18px;
+      flex-shrink: 0;
+    }
+
+    #input-wrapper {
+      display: flex; gap: 8px; align-items: flex-end;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      transition: border-color 120ms;
+    }
+    #input-wrapper:focus-within { border-color: #374151; }
+
+    #chat-input {
+      flex: 1;
+      background: transparent;
+      border: none; outline: none;
+      resize: none;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+      max-height: 160px;
+      min-height: 36px;
+      height: 36px;
+      overflow-y: auto;
+      caret-color: var(--accent);
+    }
+    #chat-input::placeholder { color: var(--text-muted); }
+    #chat-input::-webkit-scrollbar { width: 3px; }
+    #chat-input::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+    #send-btn {
+      width: 32px; height: 32px;
+      border-radius: 8px; border: none;
+      background: var(--accent); color: #fff;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 120ms, transform 120ms, opacity 120ms;
+    }
+    #send-btn:hover { background: #1d4ed8; }
+    #send-btn:active { transform: scale(.92); }
+    #send-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+    #send-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── MAXIMIZE MODAL ── */
+    #maximize-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; flex-direction: column;
+      z-index: 200;
+      padding: 20px;
+      gap: 10px;
+    }
+    #maximize-overlay.hidden { display: none; }
+
+    #maximize-toolbar {
+      display: flex; align-items: center; gap: 8px;
+      flex-shrink: 0;
+    }
+    #maximize-toolbar-left { flex: 1; font-family: var(--font-mono); font-size: 11px; color: #6b7280; }
+
+    .max-btn {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 12px;
+      border-radius: 7px;
+      border: 1px solid #2a2a2a;
+      background: #1a1a1a;
+      color: #a1a1aa;
+      font-size: 11px; font-family: var(--font-mono);
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+    }
+    .max-btn:hover { background: #222; color: #e4e4e7; }
+    .max-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .max-btn.close-btn { border-color: #3f0000; color: #f87171; }
+    .max-btn.close-btn:hover { background: #1a0a0a; color: #fca5a5; }
+
+    #maximize-iframe {
+      flex: 1;
+      border: none;
+      border-radius: 12px;
+      background: #fff;
+      display: block;
+      min-height: 0;
+    }
+
+    /* ── API KEY MODAL ── */
+    #modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300; padding: 20px;
+    }
+    #modal-overlay.hidden { display: none; }
+
+    #modal {
+      background: #141414;
+      border: 1px solid #252525;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 440px; width: 100%;
+      box-shadow: 0 25px 50px rgba(0,0,0,.6);
+    }
+
+    #modal-logo {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg,#1d4ed8,#7c3aed);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    #modal-logo svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    #modal h2 { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; letter-spacing: -.02em; }
+    #modal p { font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 24px; }
+    #modal p a { color: #60a5fa; text-decoration: none; }
+    #modal p a:hover { text-decoration: underline; }
+
+    .modal-label {
+      display: block; font-size: 11px; font-family: var(--font-mono);
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em;
+      margin-bottom: 8px;
+    }
+
+    #api-key-input {
+      width: 100%;
+      background: #0f0f0f;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-family: var(--font-mono); font-size: 13px; color: var(--text);
+      outline: none;
+      transition: border-color 120ms;
+      letter-spacing: .04em;
+    }
+    #api-key-input:focus { border-color: var(--accent); }
+    #api-key-input::placeholder { color: var(--text-muted); letter-spacing: .02em; }
+
+    #modal-error { font-size: 12px; color: #f87171; margin-top: 8px; font-family: var(--font-mono); display: none; }
+    #modal-error.visible { display: block; }
+
+    #modal-submit {
+      width: 100%; margin-top: 20px; padding: 12px;
+      background: var(--accent); border: none; border-radius: 8px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: background 120ms;
+    }
+    #modal-submit:hover { background: #1d4ed8; }
+
+    .modal-footnote {
+      margin-top: 14px; font-size: 11px; color: var(--text-muted);
+      text-align: center; font-family: var(--font-mono);
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: #18181b; border: 1px solid #27272a;
+      color: #e4e4e7; font-size: 12px; font-family: var(--font-mono);
+      padding: 8px 16px; border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      opacity: 0; transition: opacity .2s, transform .2s;
+      pointer-events: none; z-index: 400; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── EMPTY STATE ── */
+    #empty-state {
+      flex: 1;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; color: var(--text-muted);
+      text-align: center; padding: 40px 20px;
+    }
+    #empty-state.hidden { display: none; }
+    .empty-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: #141414; border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .empty-icon svg { width: 22px; height: 22px; stroke: #374151; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+    #empty-state h2 { font-size: 16px; font-weight: 600; color: #374151; }
+    #empty-state p { font-size: 13px; color: #2a2a35; max-width: 300px; line-height: 1.6; }
+    .empty-hint {
+      font-family: var(--font-mono); font-size: 11px; color: #2a2a35;
+      background: #111; border: 1px solid var(--border);
+      padding: 4px 10px; border-radius: 6px;
+    }
+
+    .msg-time {
+      font-size: 10px; color: var(--text-muted);
+      margin-top: 4px; font-family: var(--font-mono);
+      padding: 0 4px;
+    }
+    .msg-row.user .msg-time { text-align: right; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <h1>HTML Chat</h1>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="model-badge">claude-opus-4-7</span>
+      <button class="top-btn" id="new-chat-btn" title="New conversation">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <button class="top-btn" id="settings-btn" title="Change API key">
+        <svg viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- MESSAGES -->
+  <div id="messages">
+    <div id="empty-state">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      </div>
+      <h2>Start a conversation</h2>
+      <p>Claude responds with rich, interactive HTML rendered right in the chat.</p>
+      <span class="empty-hint">Try: "Build a pomodoro timer" or "Visualize sorting algorithms"</span>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div id="input-area">
+    <div id="input-wrapper">
+      <textarea id="chat-input" placeholder="Ask Claude to build something..." rows="1" autocomplete="off" spellcheck="true"></textarea>
+      <button id="send-btn" title="Send (Enter)">
+        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAXIMIZE MODAL -->
+<div id="maximize-overlay" class="hidden">
+  <div id="maximize-toolbar">
+    <div id="maximize-toolbar-left">HTML Chat — Expanded view</div>
+    <button class="max-btn" id="max-copy-btn">
+      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy HTML
+    </button>
+    <button class="max-btn" id="max-open-btn">
+      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      Open in tab
+    </button>
+    <button class="max-btn close-btn" id="max-close-btn">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Close
+    </button>
+  </div>
+  <iframe id="maximize-iframe" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" title="Expanded HTML Preview" srcdoc=""></iframe>
+</div>
+
+<!-- API KEY MODAL -->
+<div id="modal-overlay" class="hidden">
+  <div id="modal">
+    <div id="modal-logo">
+      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </div>
+    <h2>Enter your API key</h2>
+    <p>
+      HTML Chat uses the Anthropic API directly in your browser. Your key is stored only in
+      <code style="font-family:var(--font-mono);font-size:11px;color:#93c5fd;">localStorage</code>
+      and never sent anywhere except Anthropic's servers.<br><br>
+      Get your key at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+    </p>
+    <label class="modal-label" for="api-key-input">Anthropic API Key</label>
+    <input id="api-key-input" type="password" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false" />
+    <div id="modal-error"></div>
+    <button id="modal-submit">Start chatting</button>
+    <p class="modal-footnote">Key saved locally · Never shared · Change anytime via ⚙</p>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- Thinking animation template — read by thinkingHtml(), no JS template literal nesting issues -->
+<script type="text/html" id="thinking-template">
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;background:#0a0a0f;overflow:hidden;font-family:'JetBrains Mono','Fira Code',ui-monospace,monospace;}
+  canvas{position:fixed;inset:0;}
+  .ui{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;pointer-events:none;}
+  .label{font-size:11px;color:rgba(99,120,255,0.7);letter-spacing:.2em;text-transform:uppercase;animation:fade 2s ease-in-out infinite;}
+  .tokens{font-size:10px;color:rgba(99,120,255,0.35);letter-spacing:.15em;}
+  @keyframes fade{0%,100%{opacity:.5;}50%{opacity:1;}}
+</style></head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui">
+  <div class="label">thinking</div>
+  <div class="tokens" id="tok">···</div>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, t = 0;
+function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+const NODES = 28;
+const nodes = Array.from({length:NODES}, (_,i) => ({
+  x:0, y:0, r:Math.random()*2+1.5,
+  phase:Math.random()*Math.PI*2,
+  speed:Math.random()*0.4+0.2,
+  layer:Math.floor(i*4/NODES)
+}));
+nodes.forEach((n,i) => {
+  n.x = n.layer*0.28+0.08+Math.random()*0.06;
+  n.y = 0.15+(i%7)*0.115+Math.random()*0.04;
+});
+
+const edges = [];
+nodes.forEach((a,i) => nodes.forEach((b,j) => {
+  if(b.layer===a.layer+1 && Math.random()>0.35) edges.push([i,j]);
+}));
+
+const pulses = [];
+function spawnPulse(){
+  if(!edges.length) return;
+  const e = edges[Math.floor(Math.random()*edges.length)];
+  pulses.push({edge:e, p:0, speed:0.008+Math.random()*0.012});
+}
+setInterval(spawnPulse, 120);
+
+let dots=0;
+setInterval(()=>{
+  dots=(dots+1)%4;
+  const d=dots||1;
+  document.getElementById('tok').textContent='·'.repeat(d)+'  generating'+'·'.repeat(3-dots%3);
+},400);
+
+function draw(){
+  t+=0.016;
+  ctx.clearRect(0,0,W,H);
+  const bg=ctx.createRadialGradient(W*.5,H*.5,0,W*.5,H*.5,W*.7);
+  bg.addColorStop(0,'#0d0d1a'); bg.addColorStop(1,'#06060f');
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+  edges.forEach(([i,j])=>{
+    const a=nodes[i],b=nodes[j];
+    const alpha=0.06+0.04*Math.sin(t*0.5+a.phase);
+    ctx.strokeStyle='rgba(80,100,255,'+alpha+')';
+    ctx.lineWidth=.6;
+    ctx.beginPath(); ctx.moveTo(a.x*W,a.y*H); ctx.lineTo(b.x*W,b.y*H); ctx.stroke();
+  });
+
+  for(let i=pulses.length-1;i>=0;i--){
+    const pu=pulses[i]; pu.p+=pu.speed;
+    if(pu.p>1){pulses.splice(i,1);continue;}
+    const [ni,nj]=pu.edge;
+    const a=nodes[ni],b=nodes[nj];
+    const x=(a.x+(b.x-a.x)*pu.p)*W;
+    const y=(a.y+(b.y-a.y)*pu.p)*H;
+    const fade=Math.sin(pu.p*Math.PI);
+    const grad=ctx.createRadialGradient(x,y,0,x,y,7);
+    grad.addColorStop(0,'rgba(120,140,255,'+(fade*0.9)+')');
+    grad.addColorStop(1,'rgba(120,140,255,0)');
+    ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.fill();
+  }
+
+  nodes.forEach(n=>{
+    const x=n.x*W,y=n.y*H;
+    const pulse=0.5+0.5*Math.sin(t*n.speed+n.phase);
+    const r=n.r+pulse*1.5;
+    const alpha=0.3+pulse*0.7;
+    const glow=ctx.createRadialGradient(x,y,0,x,y,r*4);
+    glow.addColorStop(0,'rgba(99,120,255,'+(alpha*0.3)+')');
+    glow.addColorStop(1,'rgba(99,120,255,0)');
+    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(x,y,r*4,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(140,160,255,'+alpha+')';
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+<\/script>
+</body></html>
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  const state = {
+    apiKey: '',
+    model: 'claude-opus-4-7',
+    conversation: [],
+    responses: [],       // { html, timestamp }[]
+    isStreaming: false,
+    maximizedHtml: '',
+  };
+
+  const $ = id => document.getElementById(id);
+  const messagesEl    = $('messages');
+  const emptyState    = $('empty-state');
+  const inputEl       = $('chat-input');
+  const sendBtn       = $('send-btn');
+  const modalOverlay  = $('modal-overlay');
+  const apiKeyInput   = $('api-key-input');
+  const modalError    = $('modal-error');
+  const modalSubmit   = $('modal-submit');
+  const settingsBtn   = $('settings-btn');
+  const newChatBtn    = $('new-chat-btn');
+  const toastEl       = $('toast');
+  const maxOverlay    = $('maximize-overlay');
+  const maxIframe     = $('maximize-iframe');
+  const maxCopyBtn    = $('max-copy-btn');
+  const maxOpenBtn    = $('max-open-btn');
+  const maxCloseBtn   = $('max-close-btn');
+
+  const SYSTEM_PROMPT = `You are an AI assistant that ALWAYS responds with complete, self-contained HTML documents.
+
+STRICT RULES:
+1. Every response MUST be a full HTML page: <!DOCTYPE html>.....</html>
+2. NEVER use markdown, plain text, or code fences — only raw HTML output
+3. Make responses visually stunning: CSS animations, gradients, SVG, rich typography
+4. Be information-dense and interactive — pack real content and working interactivity
+5. Use inline <style> and <script> — no external dependencies unless truly necessary
+6. CDN links OK only for specialized libs (Chart.js, D3, highlight.js, etc.)
+7. The page must be standalone in a sandboxed iframe — no assumptions about parent
+8. Use modern CSS: custom properties, clamp(), animations, flexbox/grid
+9. Prefer SVG over raster images — draw diagrams, icons, illustrations in SVG
+10. Every page: clear visual hierarchy, thoughtful color, purposeful whitespace
+11. Default: dark mode, unless content calls for light
+12. Make interactive elements actually work (tabs, toggles, accordions, sliders)
+13. Your HTML should feel like a polished web app, not a document
+
+ANTHROPIC API REFERENCE (use this to build HTML pages that call Claude directly):
+- Endpoint: POST https://api.anthropic.com/v1/messages
+- Required headers:
+    x-api-key: <key>
+    anthropic-version: 2023-06-01
+    anthropic-dangerous-direct-browser-access: true   (required for browser fetch)
+    Content-Type: application/json
+- Body shape:
+    { model, max_tokens, messages: [{role,content}], system?, stream?, thinking?, output_config? }
+- Models: claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
+- Thinking (claude-opus-4-7 only): thinking:{type:"adaptive"}, output_config:{effort:"low"|"medium"|"high"|"max"}
+- Streaming: stream:true → SSE events, parse lines starting with "data: ", event types:
+    content_block_start, content_block_delta (text_delta / thinking_delta), content_block_stop, message_stop
+- When building interactive demos that call Claude, prompt the user to enter their own API key and store it in localStorage
+
+CHAT BRIDGE API (available in every HTML response via window.ChatBridge):
+Your HTML pages run inside this chat app and can communicate with it directly.
+
+  // Send a message into the chat as if the user typed it:
+  ChatBridge.send("explain this further")
+
+  // Get notified when the next Claude response arrives:
+  ChatBridge.onMessage(function(html, text) { /* html = rendered HTML, text = raw response */ })
+
+  // Get the full conversation history:
+  ChatBridge.getHistory(function(history) { /* history = [{role, content}, ...] */ })
+
+USE CASES FOR ChatBridge:
+- "Ask follow-up" buttons that inject a pre-written question into the chat
+- Live dashboards that auto-refresh by sending a new prompt on a timer
+- Multi-step wizards where each HTML page drives the next question
+- Interactive tutors that ask the user questions and submit answers back
+- "Drill down" buttons on charts/data that ask Claude to explain a specific item
+Always prefer ChatBridge over raw fetch when the goal is to continue the conversation.`;
+
+
+  // ── CHAT BRIDGE — receive postMessage from iframe ─────────────
+  window.addEventListener('message', e => {
+    if (!e.data || typeof e.data.type !== 'string') return;
+
+    if (e.data.type === 'cb:send') {
+      // Programmatic send from iframe
+      const text = String(e.data.text || '').trim();
+      if (text) {
+        inputEl.value = text;
+        sendMessage();
+      }
+    }
+
+    if (e.data.type === 'cb:getHistory') {
+      e.source?.postMessage({
+        type: 'cb:history',
+        id: e.data.id,
+        history: state.conversation,
+      }, '*');
+    }
+  });
+
+  // After each response completes, notify all active iframes
+  function broadcastResponse(html, text) {
+    document.querySelectorAll('.bubble-iframe').forEach(f => {
+      try { f.contentWindow?.postMessage({ type: 'cb:response', html, text }, '*'); } catch {}
+    });
+  }
+
+  // ── URL → topic ───────────────────────────────────────────────
+  // /Solar-system  →  "Solar system"
+  // /Black_hole    →  "Black hole"
+  // /What-is-TCP%2FIP → "What is TCP/IP"
+  function topicFromPath() {
+    const path = decodeURIComponent(location.pathname);
+    const slug = path.replace(/^\//, '').trim();
+    if (!slug) return null;
+    // Replace hyphens and underscores with spaces, collapse multiples
+    const text = slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!text) return null;
+    // Capitalise first letter (Wikipedia convention)
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+
+  // ── INIT ──────────────────────────────────────────────────────
+  function init() {
+    const savedKey = localStorage.getItem('htmlchat_api_key');
+    if (savedKey && savedKey.startsWith('sk-')) {
+      state.apiKey = savedKey;
+      hideModal();
+    } else {
+      showModal();
+    }
+    setupInput();
+    setupModal();
+    setupMaximize();
+    setupNewChat();
+
+    // Auto-send topic from URL path after a short delay
+    const topic = topicFromPath();
+    if (topic) {
+      // Show topic in input briefly, then send
+      inputEl.value = topic;
+      inputEl.dispatchEvent(new Event('input')); // resize textarea
+      if (state.apiKey) {
+        setTimeout(() => sendMessage(), 300);
+      } else {
+        // Wait for API key to be submitted, then auto-send
+        const orig = hideModal.bind(this);
+        hideModal = function() {
+          orig();
+          setTimeout(() => sendMessage(), 300);
+          hideModal = orig; // restore
+        };
+      }
+    }
+  }
+
+  // ── MODAL ─────────────────────────────────────────────────────
+  function showModal() { modalOverlay.classList.remove('hidden'); setTimeout(() => apiKeyInput.focus(), 80); }
+  function hideModal() { modalOverlay.classList.add('hidden'); setTimeout(() => inputEl.focus(), 80); }
+
+  function setupModal() {
+    modalSubmit.addEventListener('click', submitKey);
+    apiKeyInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitKey(); });
+    settingsBtn.addEventListener('click', () => {
+      apiKeyInput.value = state.apiKey || '';
+      modalError.classList.remove('visible');
+      showModal();
+    });
+  }
+
+  function submitKey() {
+    const key = apiKeyInput.value.trim();
+    if (!key) { showError('Please enter your API key.'); return; }
+    if (!key.startsWith('sk-')) { showError('API key should start with "sk-".'); return; }
+    state.apiKey = key;
+    localStorage.setItem('htmlchat_api_key', key);
+    modalError.classList.remove('visible');
+    hideModal();
+  }
+
+  function showError(msg) {
+    modalError.textContent = msg;
+    modalError.classList.add('visible');
+  }
+
+  // ── NEW CHAT ──────────────────────────────────────────────────
+  function setupNewChat() {
+    newChatBtn.addEventListener('click', () => {
+      if (state.isStreaming) return;
+      if (state.conversation.length === 0) return;
+      if (!confirm('Start a new conversation?')) return;
+      state.conversation = [];
+      state.responses = [];
+      messagesEl.innerHTML = '';
+      messagesEl.appendChild(emptyState);
+      emptyState.classList.remove('hidden');
+    });
+  }
+
+  // ── INPUT ─────────────────────────────────────────────────────
+  function setupInput() {
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    inputEl.addEventListener('input', () => {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+    });
+  }
+
+  // ── MAXIMIZE ──────────────────────────────────────────────────
+  function setupMaximize() {
+    maxCloseBtn.addEventListener('click', () => maxOverlay.classList.add('hidden'));
+
+    maxOverlay.addEventListener('click', e => {
+      if (e.target === maxOverlay) maxOverlay.classList.add('hidden');
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !maxOverlay.classList.contains('hidden')) {
+        maxOverlay.classList.add('hidden');
+      }
+    });
+
+    maxCopyBtn.addEventListener('click', async () => {
+      if (!state.maximizedHtml) return;
+      try {
+        await navigator.clipboard.writeText(state.maximizedHtml);
+        maxCopyBtn.classList.add('copied');
+        maxCopyBtn.childNodes[1].textContent = ' Copied!';
+        showToast('HTML copied');
+        setTimeout(() => {
+          maxCopyBtn.classList.remove('copied');
+          maxCopyBtn.childNodes[1].textContent = ' Copy HTML';
+        }, 2000);
+      } catch { showToast('Could not copy'); }
+    });
+
+    maxOpenBtn.addEventListener('click', () => {
+      if (!state.maximizedHtml) return;
+      const blob = new Blob([state.maximizedHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (win) setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+  }
+
+  function openMaximize(html) {
+    state.maximizedHtml = html;
+    try {
+      const doc = maxIframe.contentDocument;
+      doc.open();
+      doc.write(html);
+      doc.close();
+    } catch(e) {
+      maxIframe.srcdoc = html;
+    }
+    maxOverlay.classList.remove('hidden');
+  }
+
+  // ── SEND MESSAGE ──────────────────────────────────────────────
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || state.isStreaming) return;
+    if (!state.apiKey) { showModal(); return; }
+
+    emptyState.classList.add('hidden');
+    state.conversation.push({ role: 'user', content: text });
+    appendUserBubble(text);
+
+    inputEl.value = '';
+    inputEl.style.height = '36px';
+    sendBtn.disabled = true;
+    state.isStreaming = true;
+    scrollBottom(true); // force-scroll when user sends a message
+
+    const responseIndex = state.responses.length;
+    state.responses.push({ html: '', timestamp: new Date() });
+
+    // Create the assistant bubble now (will be filled as we stream)
+    const { wrap, iframe, statusDot, statusLabel, maximizeBtn, copyBtn } =
+      appendAssistantBubble(responseIndex);
+
+    let accumulated = '';
+
+    // During streaming: document.write for live preview (fast, no full reload).
+    // After streaming: srcdoc swap so scripts execute cleanly in a fresh context.
+    function liveRenderToIframe(html) {
+      try {
+        const doc = iframe.contentDocument;
+        doc.open();
+        doc.write(html);
+        doc.close();
+      } catch(e) { /* sandboxed — skip live preview */ }
+    }
+
+    function finalRenderToIframe(html) {
+      // srcdoc causes a proper reload → scripts fire correctly
+      iframe.srcdoc = html;
+    }
+
+    // Throttle live updates to 400ms to reduce churn while streaming
+    let lastRender = 0;
+    let renderPending = null;
+    function throttledRender(html) {
+      if (renderPending) { clearTimeout(renderPending); renderPending = null; }
+      const now = Date.now();
+      if (now - lastRender > 400) {
+        lastRender = now;
+        liveRenderToIframe(html);
+      } else {
+        renderPending = setTimeout(() => {
+          renderPending = null;
+          lastRender = Date.now();
+          liveRenderToIframe(state.responses[responseIndex].html);
+        }, 400);
+      }
+    }
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': state.apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: state.model,
+          max_tokens: 16000,
+          thinking: { type: 'adaptive' },
+          output_config: { effort: 'medium' },
+          stream: true,
+          system: SYSTEM_PROMPT,
+          messages: state.conversation,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      }
+
+      wrap.classList.add('streaming');
+      statusDot.classList.add('streaming');
+      statusLabel.textContent = 'Thinking...';
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let thinkingText = '';
+      let isThinking = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+          let ev;
+          try { ev = JSON.parse(data); } catch { continue; }
+
+          // Track when a thinking block starts/ends
+          if (ev.type === 'content_block_start') {
+            isThinking = ev.content_block?.type === 'thinking';
+            console.log('[block_start]', ev.content_block?.type);
+          }
+          if (ev.type === 'content_block_stop') {
+            isThinking = false;
+          }
+          if (ev.type === 'message_start') {
+            console.log('[message_start]', JSON.stringify(ev.message?.usage));
+          }
+
+          if (ev.type === 'content_block_delta') {
+            // Thinking text — render live in the iframe
+            if (ev.delta?.type === 'thinking_delta') {
+              thinkingText += ev.delta.thinking;
+              liveRenderToIframe(thinkingIframeHtml(thinkingText));
+              statusLabel.textContent = 'Thinking...';
+              console.log('[thinking]', ev.delta.thinking.slice(0, 60));
+            }
+            // HTML response text
+            if (ev.delta?.type === 'text_delta') {
+              if (statusLabel.textContent === 'Thinking...') {
+                statusLabel.textContent = 'Rendering...';
+              }
+              accumulated += ev.delta.text;
+              const liveHtml = extractHtml(accumulated);
+              if (liveHtml) {
+                state.responses[responseIndex].html = liveHtml;
+                throttledRender(liveHtml);
+              }
+            }
+          }
+        }
+      }
+
+      // Final — srcdoc swap so scripts execute in a clean context
+      if (renderPending) { clearTimeout(renderPending); renderPending = null; }
+      const finalHtml = extractHtml(accumulated) || fallbackHtml(accumulated);
+      state.responses[responseIndex].html = injectChatBridge(finalHtml);
+      finalRenderToIframe(state.responses[responseIndex].html);
+
+      state.conversation.push({ role: 'assistant', content: accumulated });
+
+      wrap.classList.remove('streaming');
+      statusDot.classList.remove('streaming');
+      statusLabel.textContent = 'Done · ' + formatTime(state.responses[responseIndex].timestamp);
+      maximizeBtn.style.display = '';
+      copyBtn.style.display = '';
+      broadcastResponse(state.responses[responseIndex].html, accumulated);
+
+    } catch (err) {
+      const errHtml = makeErrorHtml(err.message);
+      state.responses[responseIndex].html = errHtml;
+      finalRenderToIframe(errHtml);
+      wrap.classList.remove('streaming');
+      statusDot.classList.remove('streaming');
+      statusLabel.textContent = 'Error: ' + err.message.slice(0, 60);
+      state.conversation.pop();
+    } finally {
+      state.isStreaming = false;
+      sendBtn.disabled = false;
+      scrollBottom();
+      inputEl.focus();
+    }
+  }
+
+  // ── BUBBLE BUILDERS ───────────────────────────────────────────
+  function appendUserBubble(text) {
+    const row = document.createElement('div');
+    row.className = 'msg-row user';
+    row.innerHTML = `<div class="bubble-user">${escHtml(text)}</div><div class="msg-time">${formatTime(new Date())}</div>`;
+    messagesEl.appendChild(row);
+    scrollBottom();
+  }
+
+  function appendAssistantBubble(index) {
+    const row = document.createElement('div');
+    row.className = 'msg-row assistant';
+    row.dataset.index = index;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble-assistant';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'bubble-iframe-wrap';
+
+    const iframe = document.createElement('iframe');
+    iframe.className = 'bubble-iframe';
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+    iframe.title = 'HTML Preview';
+    iframe.srcdoc = thinkingHtml();
+
+    wrap.appendChild(iframe);
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'bubble-toolbar';
+
+    const left = document.createElement('div');
+    left.className = 'bubble-toolbar-left';
+
+    const dot = document.createElement('div');
+    dot.className = 'status-dot';
+
+    const label = document.createElement('span');
+    label.textContent = 'Waiting...';
+
+    left.appendChild(dot);
+    left.appendChild(label);
+
+    const maximizeBtn = document.createElement('button');
+    maximizeBtn.className = 'tbtn tbtn-maximize';
+    maximizeBtn.style.display = 'none';
+    maximizeBtn.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg> Expand`;
+    maximizeBtn.addEventListener('click', () => openMaximize(state.responses[index].html));
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'tbtn';
+    copyBtn.style.display = 'none';
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy`;
+    copyBtn.addEventListener('click', async () => {
+      const html = state.responses[index]?.html;
+      if (!html) return;
+      try {
+        await navigator.clipboard.writeText(html);
+        copyBtn.classList.add('copied');
+        copyBtn.childNodes[1].textContent = ' Copied!';
+        showToast('HTML copied');
+        setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.childNodes[1].textContent = ' Copy'; }, 2000);
+      } catch { showToast('Could not copy'); }
+    });
+
+    toolbar.appendChild(left);
+    toolbar.appendChild(copyBtn);
+    toolbar.appendChild(maximizeBtn);
+
+    bubble.appendChild(wrap);
+    bubble.appendChild(toolbar);
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollBottom();
+
+    return { wrap, iframe, statusDot: dot, statusLabel: label, maximizeBtn, copyBtn };
+  }
+
+  // ── HTML HELPERS ──────────────────────────────────────────────
+  function extractHtml(raw) {
+    if (!raw) return '';
+    const t = raw.trim();
+    if (t.startsWith('<!DOCTYPE') || t.startsWith('<html')) return t;
+    const cbm = t.match(/```(?:html)?\s*([\s\S]*?)(?:```|$)/i);
+    if (cbm) { const i = cbm[1].trim(); if (i.startsWith('<!DOCTYPE') || i.startsWith('<html')) return i; }
+    const di = t.indexOf('<!DOCTYPE');
+    if (di >= 0) return t.slice(di);
+    const hi = t.indexOf('<html');
+    if (hi >= 0) return t.slice(hi);
+    return '';
+  }
+
+
+  // Inject ChatBridge API into Claude's HTML before rendering
+  function injectChatBridge(html) {
+    const bridge = `<script>
+(function(){
+  var _listeners = [];
+  window.ChatBridge = {
+    // Send a message into the chat as if the user typed it
+    send: function(text) {
+      window.parent.postMessage({ type: 'cb:send', text: text }, '*');
+    },
+    // Register a callback for when a new Claude response arrives
+    onMessage: function(cb) {
+      _listeners.push(cb);
+      window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'cb:response') cb(e.data.html, e.data.text);
+      });
+    },
+    // Get the current conversation history [{role,content}]
+    getHistory: function(cb) {
+      var id = Math.random().toString(36).slice(2);
+      window.parent.postMessage({ type: 'cb:getHistory', id: id }, '*');
+      window.addEventListener('message', function handler(e) {
+        if (e.data && e.data.type === 'cb:history' && e.data.id === id) {
+          window.removeEventListener('message', handler);
+          cb(e.data.history);
+        }
+      });
+    },
+  };
+})();
+<\/script>`;
+    // Inject just before </body> or </html>, or prepend if neither found
+    if (html.includes('</body>')) return html.replace('</body>', bridge + '</body>');
+    if (html.includes('</html>')) return html.replace('</html>', bridge + '</html>');
+    return html + bridge;
+  }
+
+  function thinkingHtml() {
+    return document.getElementById('thinking-template').textContent;
+  }
+
+  function thinkingIframeHtml(text) {
+    const escaped = text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\n/g,'<br>');
+    return '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+      + 'html,body{margin:0;height:100%;background:#07070f;color:#a0a8d0;font-family:"JetBrains Mono","Fira Code",ui-monospace,monospace;font-size:11.5px;line-height:1.7;overflow:hidden;}'
+      + '#wrap{position:fixed;inset:0;display:flex;flex-direction:column;}'
+      + '#header{flex-shrink:0;padding:10px 16px 8px;border-bottom:1px solid #1a1a2e;display:flex;align-items:center;gap:8px;}'
+      + '.dot{width:6px;height:6px;border-radius:50%;background:#6366f1;animation:blink 1.2s ease-in-out infinite;}'
+      + '.dot:nth-child(2){animation-delay:.2s;}.dot:nth-child(3){animation-delay:.4s;}'
+      + '@keyframes blink{0%,100%{opacity:.2;}50%{opacity:1;}}'
+      + '.hdr-label{font-size:10px;color:#4a4a6a;letter-spacing:.15em;text-transform:uppercase;}'
+      + '#content{flex:1;overflow-y:auto;padding:14px 16px;}'
+      + '#content::-webkit-scrollbar{width:3px;}'
+      + '#content::-webkit-scrollbar-thumb{background:#1e1e3a;border-radius:2px;}'
+      + '.cursor{display:inline-block;width:7px;height:13px;background:#6366f1;animation:blink 1s step-end infinite;vertical-align:text-bottom;margin-left:2px;}'
+      + '</style></head><body>'
+      + '<div id="wrap">'
+      + '<div id="header"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="hdr-label">thinking</span></div>'
+      + '<div id="content">' + escaped + '<span class="cursor"></span></div>'
+      + '</div>'
+      + '<script>var c=document.getElementById("content");c.scrollTop=c.scrollHeight;<\/script>'
+      + '</body></html>';
+  }
+
+  function fallbackHtml(raw) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{font-family:monospace;padding:24px;background:#0f0f0f;color:#e8e8e8;white-space:pre-wrap;font-size:13px;line-height:1.6;}</style>
+</head><body>${escHtml(raw)}</body></html>`;
+  }
+
+  function makeErrorHtml(msg) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{min-height:100vh;background:#0a0a0a;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;padding:32px 20px;}
+  .card{background:#111;border:1px solid #300;border-radius:16px;padding:36px;max-width:480px;width:100%;text-align:center;}
+  .icon{font-size:32px;margin-bottom:16px;}
+  h1{font-size:18px;color:#fca5a5;margin-bottom:10px;font-weight:600;}
+  p{font-size:13px;color:#6b7280;margin-bottom:16px;line-height:1.6;}
+  code{display:block;background:#0f0f0f;border:1px solid #222;border-radius:8px;padding:12px 14px;font-family:monospace;font-size:12px;color:#f87171;text-align:left;word-break:break-all;}
+</style></head>
+<body><div class="card"><div class="icon">⚠</div><h1>API Error</h1><p>Something went wrong with the Anthropic API.</p><code>${escHtml(msg)}</code></div></body></html>`;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── UTILS ─────────────────────────────────────────────────────
+  // Only auto-scroll if user is already near the bottom (within 120px)
+  function scrollBottom(force = false) {
+    const distFromBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    if (force || distFromBottom < 120) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  }
+  function formatTime(d) { return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+
+  let toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2500);
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
