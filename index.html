@@ -666,22 +666,42 @@ ANTHROPIC API REFERENCE (use this to build HTML pages that call Claude directly)
 CHAT BRIDGE API (available in every HTML response via window.ChatBridge):
 Your HTML pages run inside this chat app and can communicate with it directly.
 
-  // Send a message into the chat as if the user typed it:
-  ChatBridge.send("explain this further")
+  ChatBridge.send(text)                   // Send a message into chat as if the user typed it
+  ChatBridge.onMessage(fn(html, text))    // Called when the next Claude response arrives
+  ChatBridge.getHistory(fn(history))      // Get conversation history [{role, content}, ...]
 
-  // Get notified when the next Claude response arrives:
-  ChatBridge.onMessage(function(html, text) { /* html = rendered HTML, text = raw response */ })
+CONTEXTUAL BROWSING — THE CORE PATTERN:
+Think of every response as a Wikipedia article that the user can navigate from.
+Instead of dead text, make your HTML a living, explorable knowledge graph.
 
-  // Get the full conversation history:
-  ChatBridge.getHistory(function(history) { /* history = [{role, content}, ...] */ })
+ALWAYS include at minimum:
+1. **Contextual links** — Every key concept, person, term, or place should be a clickable element
+   that calls ChatBridge.send("Tell me about [concept] in the context of [current topic]").
+   Style them like hyperlinks (underlined, accent color) so they feel naturally clickable.
 
-USE CASES FOR ChatBridge:
-- "Ask follow-up" buttons that inject a pre-written question into the chat
-- Live dashboards that auto-refresh by sending a new prompt on a timer
-- Multi-step wizards where each HTML page drives the next question
-- Interactive tutors that ask the user questions and submit answers back
-- "Drill down" buttons on charts/data that ask Claude to explain a specific item
-Always prefer ChatBridge over raw fetch when the goal is to continue the conversation.`;
+2. **"Explore further" section** — At the bottom of every page, show 3–5 related topic buttons
+   that send natural follow-up questions. Example:
+     ChatBridge.send("What is the history of [related topic]?")
+
+3. **Drill-down on sections** — Each major section heading should have a subtle "→ deep dive"
+   button that sends a focused question about just that section.
+
+4. **Breadcrumb context** — Use getHistory() to show where the user came from and offer a
+   "← back to [previous topic]" button that re-sends the prior topic.
+
+5. **"See also" cluster** — A visual grid of 4–6 related concepts the user hasn't explored yet,
+   each as a ChatBridge.send button. This is the key to making browsing feel emergent.
+
+NAVIGATION STYLE GUIDE:
+- Clickable concepts: inline, look like wiki links (blue/accent underline, cursor:pointer)
+- Section deep-dives: small "↗ explore" badge on hover near headings
+- Bottom explore panel: card grid with topic name + one-line description, clicking sends the query
+- Back button: only show if getHistory() has prior turns
+- Never use <a href> for internal navigation — always ChatBridge.send()
+- Prefer "Tell me about X in the context of Y" over bare "What is X?" to preserve context
+
+THE GOAL: the user should never feel they've hit a dead end. Every page should make them
+curious about at least 3 more things, and clicking any of them should feel instant and magical.`;
 
 
   // ── CHAT BRIDGE — receive postMessage from iframe ─────────────
