@@ -773,8 +773,10 @@ ANTHROPIC API REFERENCE (use this to build HTML pages that call Claude directly)
     Content-Type: application/json
 - Body shape:
     { model, max_tokens, messages: [{role,content}], system?, stream?, thinking?, output_config? }
-- Models: claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
-- Thinking (claude-opus-4-7 only): thinking:{type:"adaptive"}, output_config:{effort:"low"|"medium"|"high"|"max"}
+- Models (Anthropic): claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
+- Models (DeepSeek): deepseek-chat, deepseek-reasoner
+- Models (OpenRouter): any model slug from openrouter.ai/models
+- Thinking (Anthropic claude-opus-4-7 only): thinking:{type:"adaptive"}, output_config:{effort:"low"|"medium"|"high"|"max"}
 - Streaming: stream:true → SSE events, parse lines starting with "data: ", event types:
     content_block_start, content_block_delta (text_delta / thinking_delta), content_block_stop, message_stop
 - When building interactive demos that call Claude, prompt the user to enter their own API key and store it in localStorage
@@ -1126,6 +1128,7 @@ about at least 3 more things, and clicking any of them should feel instant and m
 
     try {
       // Build request per provider
+      console.log('[provider]', state.provider, '[model]', state.model, '[key prefix]', state.apiKey.slice(0, 10));
       let res;
       if (state.provider === 'anthropic') {
         res = await fetch('https://api.anthropic.com/v1/messages', {
