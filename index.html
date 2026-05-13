@@ -995,7 +995,8 @@ Anthropic API (for pages that call Claude directly):
     }
 
     const savedKey = localStorage.getItem(PROVIDERS[state.provider].keyStorageKey);
-    if (savedKey && savedKey.startsWith('sk-')) {
+    const validKey = savedKey && (savedKey.startsWith('sk-') || savedKey.startsWith('AIza'));
+    if (validKey) {
       state.apiKey = savedKey;
       hideModal();
     } else {
