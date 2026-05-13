@@ -305,7 +305,10 @@
     #input-area {
       border-top: 1px solid var(--border);
       padding: 14px 20px 18px;
+      padding-bottom: max(18px, env(safe-area-inset-bottom));
       flex-shrink: 0;
+      position: relative;
+      z-index: 1;
     }
 
     #input-wrapper {
@@ -315,6 +318,7 @@
       border-radius: 14px;
       padding: 10px 12px;
       transition: border-color 120ms;
+      overflow: visible;
     }
     #input-wrapper:focus-within { border-color: #374151; }
 
@@ -549,7 +553,7 @@
       .bubble-toolbar { padding: 6px 8px; gap: 4px; flex-wrap: wrap; }
       .tbtn { font-size: 9px; padding: 3px 6px; }
 
-      #input-area { padding: 10px 12px 14px; }
+      #input-area { padding: 10px 12px max(14px, env(safe-area-inset-bottom)); }
       #input-wrapper { padding: 8px 10px; border-radius: 12px; }
       #chat-input { font-size: 16px; /* prevent iOS zoom */ }
 
