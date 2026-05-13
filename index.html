@@ -889,10 +889,7 @@ Anthropic API (for pages that call Claude directly):
         maxOverlay.classList.add('hidden');
       }
       const text = String(e.data.text || '').trim();
-      if (text) {
-        inputEl.value = text;
-        sendMessage();
-      }
+      if (text) sendMessage(text);
     }
 
     if (e.data.type === 'cb:getHistory') {
@@ -1159,8 +1156,8 @@ Anthropic API (for pages that call Claude directly):
   }
 
   // ── SEND MESSAGE ──────────────────────────────────────────────
-  async function sendMessage() {
-    const text = inputEl.value.trim();
+  async function sendMessage(forcedText) {
+    const text = forcedText || inputEl.value.trim();
     if (!text || state.isStreaming) return;
     if (!state.apiKey) { showModal(); return; }
 
