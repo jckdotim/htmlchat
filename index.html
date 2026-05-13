@@ -344,6 +344,15 @@
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
       transition: background 120ms, transform 120ms, opacity 120ms;
+      /* Expand touch target to 44px without changing visual size */
+      position: relative;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #send-btn::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
     }
     #send-btn:hover { background: #1d4ed8; }
     #send-btn:active { transform: scale(.92); }
