@@ -572,6 +572,11 @@
           <div class="model-group-label">DeepSeek</div>
           <button class="model-opt" data-provider="deepseek" data-model="deepseek-chat">DeepSeek V4 (Chat)</button>
           <button class="model-opt" data-provider="deepseek" data-model="deepseek-reasoner">DeepSeek V4 (Reasoner)</button>
+          <div class="model-group-label">Gemini (Google)</div>
+          <button class="model-opt" data-provider="gemini" data-model="gemini-3-flash">Gemini 3 Flash</button>
+          <button class="model-opt" data-provider="gemini" data-model="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</button>
+          <button class="model-opt" data-provider="gemini" data-model="gemini-2.5-pro-preview-05-06">Gemini 2.5 Pro</button>
+          <button class="model-opt" data-provider="gemini" data-model="gemini-2.5-flash-preview-04-17">Gemini 2.5 Flash</button>
           <div class="model-group-label">OpenRouter</div>
           <button class="model-opt" data-provider="openrouter" data-model="google/gemini-3-flash-preview">Gemini 3 Flash</button>
           <button class="model-opt" data-provider="openrouter" data-model="google/gemini-3.1-flash-lite-preview">Gemini 3.1 Flash Lite</button>
@@ -648,6 +653,7 @@
     <!-- Provider tabs -->
     <div id="modal-tabs">
       <button class="modal-tab active" data-provider="anthropic">Anthropic</button>
+      <button class="modal-tab" data-provider="gemini">Gemini</button>
       <button class="modal-tab" data-provider="deepseek">DeepSeek</button>
       <button class="modal-tab" data-provider="openrouter">OpenRouter</button>
     </div>
@@ -776,6 +782,7 @@ draw();
     anthropic:  { name: 'Anthropic',  keyStorageKey: 'htmlchat_api_key',          placeholder: 'sk-ant-api03-...' },
     deepseek:   { name: 'DeepSeek',   keyStorageKey: 'htmlchat_deepseek_key',     placeholder: 'sk-...' },
     openrouter: { name: 'OpenRouter', keyStorageKey: 'htmlchat_openrouter_key',   placeholder: 'sk-or-...' },
+    gemini:     { name: 'Gemini',     keyStorageKey: 'htmlchat_gemini_key',       placeholder: 'AIza...' },
   };
 
   const state = {
@@ -1039,7 +1046,11 @@ Anthropic API (for pages that call Claude directly):
   function submitKey() {
     const key = apiKeyInput.value.trim();
     if (!key) { showError('Please enter your API key.'); return; }
-    if (!key.startsWith('sk-')) { showError('API key should start with "sk-".'); return; }
+    const validPrefix = modalProvider === 'gemini' ? key.startsWith('AIza') : key.startsWith('sk-');
+    if (!validPrefix) {
+      showError(modalProvider === 'gemini' ? 'Gemini key should start with "AIza".' : 'API key should start with "sk-".');
+      return;
+    }
     // Save for whichever tab is active in the modal
     localStorage.setItem(PROVIDERS[modalProvider].keyStorageKey, key);
     showToast(PROVIDERS[modalProvider].name + ' key saved');
@@ -1239,6 +1250,25 @@ Anthropic API (for pages that call Claude directly):
             stream: true,
             system: SYSTEM_PROMPT,
             messages: state.conversation,
+          }),
+        });
+      } else if (state.provider === 'gemini') {
+        // Google Gemini via OpenAI-compatible endpoint
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`, {
+          method: 'POST',
+          signal: abortController.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + state.apiKey,
+          },
+          body: JSON.stringify({
+            model: state.model,
+            max_tokens: 16000,
+            stream: true,
+            messages: [
+              { role: 'system', content: SYSTEM_PROMPT },
+              ...state.conversation,
+            ],
           }),
         });
       } else {
