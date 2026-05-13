@@ -574,6 +574,7 @@
           <button class="model-opt" data-provider="deepseek" data-model="deepseek-reasoner">DeepSeek V4 (Reasoner)</button>
           <div class="model-group-label">OpenRouter</div>
           <button class="model-opt" data-provider="openrouter" data-model="google/gemini-2.5-pro">Gemini 2.5 Pro</button>
+          <button class="model-opt" data-provider="openrouter" data-model="google/gemini-2.5-flash">Gemini 2.5 Flash</button>
           <button class="model-opt" data-provider="openrouter" data-model="meta-llama/llama-4-maverick">Llama 4 Maverick</button>
           <button class="model-opt" data-provider="openrouter" data-model="x-ai/grok-3">Grok 3</button>
         </div>
@@ -862,7 +863,8 @@ Anthropic API (for pages that call Claude directly):
   POST https://api.anthropic.com/v1/messages
   Headers: x-api-key, anthropic-version: 2023-06-01, anthropic-dangerous-direct-browser-access: true, Content-Type: application/json
   Body: { model, max_tokens, messages, system?, stream?, thinking?, output_config? }
-  Models: claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
+  Models (Anthropic): claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5-20251001
+  Models (OpenRouter): google/gemini-2.5-pro, google/gemini-2.5-flash, meta-llama/llama-4-maverick, x-ai/grok-3
   Streaming: stream:true → SSE "data: " lines → content_block_delta (text_delta / thinking_delta)
   Always prompt for API key and store in localStorage.`;
 
