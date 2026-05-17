@@ -1400,6 +1400,7 @@ Anthropic API (for pages that call Claude directly):
                         newFrame.style.opacity = '1';
                         iframe.style.transition = 'opacity 0.35s ease';
                         iframe.style.opacity = '0';
+                        scrollBottom();
                         setTimeout(() => {
                           iframe.remove();
                           newFrame.style.position = '';
@@ -1443,6 +1444,7 @@ Anthropic API (for pages that call Claude directly):
                       newFrame.style.opacity = '1';
                       iframe.style.transition = 'opacity 0.35s ease';
                       iframe.style.opacity = '0';
+                      scrollBottom();
                       setTimeout(() => {
                         iframe.remove();
                         newFrame.style.position = '';
