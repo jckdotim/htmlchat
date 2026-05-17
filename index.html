@@ -1400,13 +1400,13 @@ Anthropic API (for pages that call Claude directly):
                         newFrame.style.opacity = '1';
                         iframe.style.transition = 'opacity 0.35s ease';
                         iframe.style.opacity = '0';
-                        scrollBottom();
                         setTimeout(() => {
                           iframe.remove();
                           newFrame.style.position = '';
                           newFrame.style.inset = '';
                           newFrame.style.transition = '';
                           activeIframe = newFrame; // throttledRender now targets the real frame
+                          scrollBottom(); // scroll after layout settles with normal flow
                         }, 380);
                       });
                     }, { once: true });
@@ -1444,13 +1444,13 @@ Anthropic API (for pages that call Claude directly):
                       newFrame.style.opacity = '1';
                       iframe.style.transition = 'opacity 0.35s ease';
                       iframe.style.opacity = '0';
-                      scrollBottom();
                       setTimeout(() => {
                         iframe.remove();
                         newFrame.style.position = '';
                         newFrame.style.inset = '';
                         newFrame.style.transition = '';
                         activeIframe = newFrame;
+                        scrollBottom(); // scroll after layout settles with normal flow
                       }, 380);
                     });
                   }, { once: true });
