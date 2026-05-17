@@ -1134,6 +1134,7 @@ Anthropic API (for pages that call Claude directly):
   // ── INPUT ─────────────────────────────────────────────────────
   function setupInput() {
     sendBtn.addEventListener('click', sendMessage);
+    sendBtn.addEventListener('touchend', e => { e.preventDefault(); if (!sendBtn.disabled) sendMessage(); });
     inputEl.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendMessage(); }
     });
@@ -1195,7 +1196,7 @@ Anthropic API (for pages that call Claude directly):
 
   // ── SEND MESSAGE ──────────────────────────────────────────────
   async function sendMessage(forcedText) {
-    const text = forcedText || inputEl.value.trim();
+    const text = (typeof forcedText === 'string' ? forcedText : inputEl.value).trim();
     if (!text || state.isStreaming) return;
     if (!state.apiKey) { showModal(); return; }
 
